@@ -64,6 +64,3 @@ while True:
         else:
             print(response.message.content)
             break
-
-
-# revisa el archivo tools/ejecutar_tests.py
