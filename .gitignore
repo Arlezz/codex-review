@@ -1,0 +1,33 @@
+# Entorno virtual
+.venv/
+venv/
+env/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# ChromaDB — generado automáticamente
+chroma_db/
+
+# Reportes generados
+reports/
+
+# Variables de entorno
+.env
+
+# pytest
+.pytest_cache/
+htmlcov/
+.coverage
+
+# IDEs
+.vscode/
+.idea/
+
+# uv
+.python-version
+uv.lock

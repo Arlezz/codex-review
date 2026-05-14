@@ -1,0 +1,20 @@
+[project]
+name = "testing"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+    "black>=26.3.1",
+    "chromadb>=1.5.8",
+    "dotenv>=0.9.9",
+    "fastapi>=0.136.1",
+    "google-genai>=1.73.1",
+    "ollama>=0.6.1",
+    "pyautogui>=0.9.54",
+    "pytest>=9.0.3",
+    "pywin32>=311",
+    "ruff>=0.15.12",
+    "sentence-transformers>=5.4.1",
+    "uvicorn>=0.46.0",
+]
