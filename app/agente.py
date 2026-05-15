@@ -3,6 +3,12 @@ from tools.leer_archivo import leer_archivo
 from tools.buscar_contexto import buscar_contexto
 from tools.ejecutar_tests import ejecutar_tests
 from tools.guardar_reporte import guardar_reporte
+from dotenv import load_dotenv
+import os
+
+load_dotenv()
+
+MODEL_NAME = os.getenv("MODEL_NAME", "qwen2.5:7b")
 
 SYSTEM_PROMPT = """
 Eres un agente de code review experto .
@@ -45,7 +51,7 @@ while True:
     messages.append({"role": "user", "content": user_input})
 
     while True:
-        response = chat(model="qwen2.5:32b", messages=messages, tools=tools)
+        response = chat(model=MODEL_NAME, messages=messages, tools=tools)
         messages.append(response.message)
 
         if response.message.tool_calls:
@@ -53,12 +59,30 @@ while True:
                 if tc.function.name in tools_map.keys():
                     tool_name = tc.function.name
                     tool_input = tc.function.arguments
-                    tool_output = tools_map[tool_name](**tool_input)
+
+                    try:
+                        tool_output = tools_map[tool_name](**tool_input)
+                        messages.append(
+                            {
+                                "role": "tool",
+                                "tool_name": tool_name,
+                                "content": str(tool_output),
+                            }
+                        )
+                    except Exception as e:
+                        messages.append(
+                            {
+                                "role": "tool",
+                                "tool_name": tool_name,
+                                "content": str(e),
+                            }
+                        )
+                else:
                     messages.append(
                         {
                             "role": "tool",
-                            "tool_name": tool_name,
-                            "content": str(tool_output),
+                            "tool_name": tc.function.name,
+                            "content": f"Tool {tc.function.name} no encontrada.",
                         }
                     )
         else:

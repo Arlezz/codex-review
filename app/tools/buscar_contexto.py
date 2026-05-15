@@ -17,6 +17,10 @@ def buscar_contexto(query: str, n_resultados: int = 5) -> list[dict]:
     coleccion = chroma.get_or_create_collection(
         CHROMA_COLLECTION, metadata={"hnsw:space": "cosine"}
     )
+
+    if coleccion.count() == 0:
+        return []
+
     resultados = coleccion.query(
         query_embeddings=[query_embedding],
         n_results=min(n_resultados, coleccion.count()),
