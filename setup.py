@@ -1,21 +1,21 @@
-# from app.indexer import indexar
-# import sys
-
-# ruta = sys.argv[1] if len(sys.argv) > 1 else "."
-# indexar(ruta)
-
-
+from pathlib import Path
 from app.indexer import indexar
 
-archivos = [
-    "app/tools/leer_archivo.py",
-    "app/tools/buscar_contexto.py",
-    "app/tools/ejecutar_tests.py",
-    "app/tools/guardar_reporte.py",
-    "app/agente.py",
-    "app/indexer.py",
-]
+exclusiones = {"__pycache__", ".venv", ".git", "tests"}
+archivos_excluidos = {"__init__.py", "setup.py"}
 
-for archivo in archivos:
-    chunks = indexar(archivo)
+directorio_actual = Path(".")
+
+for archivo in directorio_actual.rglob("*.py"):
+    # filtro de exclusiones
+    if any(parte in exclusiones for parte in archivo.parts):
+        continue
+
+    if archivo.name in archivos_excluidos:
+        continue
+
+    # llamar indexar
+    chunks = indexar(str(archivo))
+
+    # imprimir resultado
     print(f"✓ {archivo} — {chunks} chunks")

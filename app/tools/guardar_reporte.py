@@ -3,7 +3,9 @@ import pathlib
 
 def guardar_reporte(archivo_revisado: str, issues: list[dict[str, str]]) -> dict:
 
-    reporte = pathlib.Path(f"reports/reporte_{archivo_revisado}.md")
+    file_path = pathlib.Path(archivo_revisado)
+
+    reporte = pathlib.Path(f"reports/reporte_{file_path.name}.md")
     reporte.parent.mkdir(parents=True, exist_ok=True)
 
     lineas = []
