@@ -14,7 +14,7 @@ __pycache__/
 chroma_db/
 
 # Reportes generados
-reports/
+generated_reports/
 
 # Variables de entorno
 .env

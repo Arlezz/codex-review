@@ -31,8 +31,8 @@ def chunk_texto(texto: str, chunk_size: int = 5, overlap: int = 2) -> list[str]:
 def indexar(path: str) -> int:
     content_file = Path(path).read_text(encoding="utf-8")
 
-    chunk_size = 5
-    overlap = 2
+    chunk_size = 10
+    overlap = 3
 
     chunks = chunk_texto(content_file, chunk_size, overlap)
 

@@ -8,7 +8,7 @@ load_dotenv()
 chroma = PersistentClient(path="./chroma_db")
 model = SentenceTransformer("all-MiniLM-L6-v2")
 
-CHROMA_COLLECTION = os.getenv("CHROMA_COLLECTION")
+CHROMA_COLLECTION = os.getenv("CHROMA_COLLECTION", "default")
 
 
 def buscar_contexto(query: str, n_resultados: int = 5) -> list[dict]:

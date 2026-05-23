@@ -1,5 +1,5 @@
 [project]
-name = "testing"
+name = "codex-review"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
@@ -16,5 +16,6 @@ dependencies = [
     "pywin32>=311 ; sys_platform == 'win32'",
     "ruff>=0.15.12",
     "sentence-transformers>=5.4.1",
+    "typer>=0.25.1",
     "uvicorn>=0.46.0",
 ]
