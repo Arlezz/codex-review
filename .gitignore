@@ -31,6 +31,3 @@ htmlcov/
 # uv
 .python-version
 uv.lock
-
-# Claude
-docs/

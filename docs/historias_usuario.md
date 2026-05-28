@@ -455,6 +455,66 @@ Como usuario, quiero ver un resumen rápido al finalizar el análisis.
 
 ---
 
+## MÓDULO 8 — Experiencia de uso
+
+### HU-016 — Auto-indexado del proyecto
+
+**Descripción**
+Como usuario, quiero ejecutar `analyze` sin tener que indexar manualmente el proyecto primero.
+
+**Contexto técnico**
+Actualmente el usuario debe ejecutar `python setup.py` antes de usar el pipeline.
+Esta HU elimina ese paso — el CLI detecta si ChromaDB está vacío y lo indexa automáticamente.
+
+**Alcance**
+
+- Detectar si ChromaDB está vacío antes de analizar
+- Si está vacío, indexar el proyecto automáticamente
+- Si ya está indexado, saltar el paso
+- Opción `--reindex` para forzar re-indexado
+
+**Criterios de aceptación**
+
+- Primera ejecución indexa automáticamente sin intervención del usuario
+- Ejecuciones posteriores no re-indexan si ChromaDB ya tiene datos
+- `analyze --reindex` fuerza un nuevo indexado completo
+- Si el directorio raíz no puede inferirse, se muestra error claro
+
+**Estado:** Pendiente
+
+---
+
+### HU-017 — Progreso de indexado
+
+**Descripción**
+Como usuario, quiero ver el progreso del indexado para saber que el sistema está trabajando.
+
+**Contexto técnico**
+El indexado puede tardar varios segundos en proyectos grandes. Sin feedback visual,
+el usuario no sabe si el sistema está colgado o procesando.
+
+**Alcance**
+
+- Barra de progreso por archivo indexado
+- Mostrar archivo actual siendo procesado
+- Mostrar total de archivos y tiempo transcurrido
+- Mensaje de confirmación al finalizar
+
+**Criterios de aceptación**
+
+- Barra de progreso visible durante el indexado
+- Muestra `archivo X de Y — nombre_archivo.py`
+- Al finalizar: `Indexado completo — N archivos, X chunks`
+- Sin progreso si solo hay 1 archivo (no es necesario)
+
+**Implementación sugerida**
+
+Usar `rich.progress` (ya disponible via Typer) o `tqdm`.
+
+**Estado:** Pendiente
+
+---
+
 ## Roadmap
 
 ### V1 — MVP funcional
@@ -480,7 +540,16 @@ Como usuario, quiero ver un resumen rápido al finalizar el análisis.
 
 ---
 
-### V3 — Integraciones
+### V3 — Experiencia de uso
+
+- HU-016 Auto-indexado del proyecto
+- HU-017 Progreso de indexado
+
+**Objetivo:** El usuario no necesita saber que ChromaDB existe. El sistema se configura solo.
+
+---
+
+### V4 — Integraciones
 
 - HU-009 Deduplicación
 - HU-011 Export JSON

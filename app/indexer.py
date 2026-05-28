@@ -1,16 +1,16 @@
-from sentence_transformers import SentenceTransformer
-from pathlib import Path
-from dotenv import load_dotenv
-from chromadb import PersistentClient
 import hashlib
-import os
+from pathlib import Path
+
+from chromadb import PersistentClient
+from dotenv import load_dotenv
+from sentence_transformers import SentenceTransformer
 
 load_dotenv()
 
 model = SentenceTransformer("all-MiniLM-L6-v2")
 chroma = PersistentClient(path="./chroma_db")
 
-CHROMA_COLLECTION = os.getenv("CHROMA_COLLECTION")
+# CHROMA_COLLECTION = os.getenv("CHROMA_COLLECTION")
 
 
 def chunk_texto(texto: str, chunk_size: int = 5, overlap: int = 2) -> list[str]:
@@ -28,7 +28,7 @@ def chunk_texto(texto: str, chunk_size: int = 5, overlap: int = 2) -> list[str]:
     return chunks
 
 
-def indexar(path: str) -> int:
+def indexar(path: str, project_name: str) -> int:
     content_file = Path(path).read_text(encoding="utf-8")
 
     chunk_size = 10
@@ -39,7 +39,7 @@ def indexar(path: str) -> int:
     chunks_embeddings = model.encode(chunks)
 
     coleccion = chroma.get_or_create_collection(
-        CHROMA_COLLECTION, metadata={"hnsw:space": "cosine"}
+        project_name, metadata={"hnsw:space": "cosine"}
     )
 
     metadatas = []
