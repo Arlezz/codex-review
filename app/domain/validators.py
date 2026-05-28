@@ -1,4 +1,5 @@
 import json
+
 from app.domain.models import Issue
 
 
@@ -22,7 +23,7 @@ def issues_validator(issues_raw: str, total_lines: int) -> list[Issue]:
         for issue in parsed_data:
             if not isinstance(issue, dict):
                 print("Error: Cada issue debe ser un diccionario.")
-                return []
+                continue
 
             try:
                 line = int(issue.get("linea", 0))
@@ -44,7 +45,15 @@ def issues_validator(issues_raw: str, total_lines: int) -> list[Issue]:
                 )
             )
 
-        return issues
+        unique_issues: list[Issue] = []
+        seen = set()
+        for issue in issues:
+            key = (issue.line, issue.title)
+            if key not in seen:
+                seen.add(key)
+                unique_issues.append(issue)
+
+        return unique_issues
 
     except json.JSONDecodeError:
         print("Error: No se pudo parsear el JSON de issues.")

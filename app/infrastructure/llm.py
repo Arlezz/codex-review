@@ -1,7 +1,9 @@
-from ollama import chat
-from app.domain.models import InputModel
-from dotenv import load_dotenv
 import os
+
+from dotenv import load_dotenv
+from ollama import chat
+
+from app.domain.models import InputModel
 
 load_dotenv()
 
@@ -16,10 +18,15 @@ Archivo: {path}
 Lenguaje: {lenguaje}
 Imports detectados: {imports}
 Funciones detectadas: {funciones}
+Clases detectadas: {clases}
 Contexto relacionado del proyecto: {rag}
 
 Código:
 {codigo}
+
+IMPORTANTE:
+Antes de reportar un issue, verifica que el problema realmente esté presente en el código. 
+No reportes como issue algo que ya está implementado correctamente.
 
 Retorna SOLO esto:
 [
@@ -40,8 +47,13 @@ def code_analyzer(input_model: InputModel) -> str:
         path=input_model.file,
         lenguaje=input_model.language,
         imports=", ".join(input_model.imports),
-        funciones=", ".join(input_model.functions),
-        rag=input_model.rag,
+        funciones=", ".join(
+            [f"{f['name']}({', '.join(f['args'])})" for f in input_model.functions]
+        ),
+        clases=", ".join(
+            [f"{c['name']}({', '.join(c['bases'])})" for c in input_model.clases]
+        ),
+        rag=_format_rag(input_model.rag),
         codigo=input_model.code,
     )
 
@@ -53,3 +65,17 @@ def code_analyzer(input_model: InputModel) -> str:
     )
 
     return response.message.content
+
+
+def _format_rag(chunks: list[dict[str, str | int | float]]) -> str:
+
+    rag_formatted = ""
+
+    if not chunks:
+        return "Sin contexto disponible."
+
+    for chunk in chunks:
+        rag_formatted += f"--- {chunk['path']} (lineas {chunk['linea_inicio']} - {chunk['linea_fin']}, relevancia {chunk['relevancia']}) ---\n"
+        rag_formatted += chunk["text"] + "\n"
+
+    return rag_formatted

@@ -32,6 +32,7 @@ class InputModel:
     file: str
     language: str
     imports: list[str]
-    functions: list[str]
-    rag: str
+    functions: list[dict[str, list[str]]]
+    clases: list[dict[str, list[str]]]
+    rag: list[dict[str, str | int | float]]
     code: str
