@@ -1,4 +1,5 @@
 import argparse
+import sys
 from pathlib import Path
 
 from app.indexer import indexar
@@ -14,7 +15,9 @@ project_path = Path(args.path)
 project_name = args.project
 
 if not project_path.exists():
-    raise Exception(f"El proyecto {project_path} no existe")
+    print(f"El proyecto {project_path} no existe")
+    sys.exit(1)
+
 
 exclusiones = {"__pycache__", ".venv", ".git", "tests"}
 archivos_excluidos = {"__init__.py", "setup.py"}
