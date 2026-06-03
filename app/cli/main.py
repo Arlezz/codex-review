@@ -1,9 +1,11 @@
-import typer
-from pathlib import Path
-from app.core.pipeline import pipeline
-from app.core.discovery import find_files
-from datetime import datetime
 import sys
+from datetime import datetime
+from pathlib import Path
+
+import typer
+
+from app.core.discovery import find_files
+from app.core.pipeline import pipeline
 
 app = typer.Typer()
 
@@ -24,7 +26,8 @@ def analyze(path: str):
 
     elif file_path.is_dir():
         files = find_files(path)
-        output_dir = f"generated_reports/{file_path.name}_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}"
+        timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        output_dir = f"generated_reports/{file_path.name}_{timestamp}"
         print(f"Archivos encontrados: {len(files)}")
         with typer.progressbar(files, label="Analizando archivos") as progress:
             for file in progress:

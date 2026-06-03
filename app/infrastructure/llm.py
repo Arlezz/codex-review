@@ -50,9 +50,7 @@ def code_analyzer(input_model: InputModel) -> str:
         funciones=", ".join(
             [f"{f['name']}({', '.join(f['args'])})" for f in input_model.functions]
         ),
-        clases=", ".join(
-            [f"{c['name']}({', '.join(c['bases'])})" for c in input_model.clases]
-        ),
+        clases=", ".join([f"{c['name']}({', '.join(c['bases'])})" for c in input_model.clases]),
         rag=_format_rag(input_model.rag),
         codigo=input_model.code,
     )
@@ -64,7 +62,7 @@ def code_analyzer(input_model: InputModel) -> str:
         messages=messages,
     )
 
-    return response.message.content
+    return response.message.content or ""
 
 
 def _format_rag(chunks: list[dict[str, str | int | float]]) -> str:
@@ -75,7 +73,11 @@ def _format_rag(chunks: list[dict[str, str | int | float]]) -> str:
         return "Sin contexto disponible."
 
     for chunk in chunks:
-        rag_formatted += f"--- {chunk['path']} (lineas {chunk['linea_inicio']} - {chunk['linea_fin']}, relevancia {chunk['relevancia']}) ---\n"
-        rag_formatted += chunk["text"] + "\n"
+        rag_formatted += (
+            f"--- {chunk['path']} "
+            f"(lineas {chunk['linea_inicio']} - {chunk['linea_fin']}, "
+            f"relevancia {chunk['relevancia']}) ---\n"
+        )
+        rag_formatted += str(chunk["text"]) + "\n"
 
     return rag_formatted

@@ -1,4 +1,5 @@
 from pathlib import Path
+
 from app.domain.models import FileContent
 
 
@@ -14,7 +15,10 @@ def read_file(file: str, max_size: int = 500_000) -> FileContent:
             text = content.decode("utf-8", errors="ignore")
             return FileContent(
                 content=text,
-                warning=f"El archivo {file} excede el tamaño máximo permitido. Se ha truncado a este tamaño para su lectura.",
+                warning=(
+                    f"El archivo {file} excede el tamaño máximo permitido. "
+                    "Se ha truncado a este tamaño para su lectura."
+                ),
             )
 
         for encoding in encodings:
@@ -26,7 +30,10 @@ def read_file(file: str, max_size: int = 500_000) -> FileContent:
 
         return FileContent(
             content="",
-            error=f"El archivo {file} no se pudo decodificar con ninguno de los encodings probados.",
+            error=(
+                f"El archivo {file} no se pudo decodificar "
+                "con ninguno de los encodings probados."
+            ),
         )
     except FileNotFoundError:
         return FileContent(

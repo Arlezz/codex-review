@@ -1,6 +1,7 @@
-from pathlib import Path
 from collections import Counter
 from datetime import datetime
+from pathlib import Path
+
 from app.domain.models import Issue
 
 

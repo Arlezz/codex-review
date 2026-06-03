@@ -1,7 +1,8 @@
-from sentence_transformers import SentenceTransformer
+import os
+
 from chromadb import PersistentClient
 from dotenv import load_dotenv
-import os
+from sentence_transformers import SentenceTransformer
 
 load_dotenv()
 
@@ -29,9 +30,16 @@ def buscar_contexto(query: str, n_resultados: int = 5) -> list[dict]:
 
     chunks = []
 
-    for i, doc in enumerate(resultados["documents"][0]):
-        meta = resultados["metadatas"][0][i]
-        distancia = resultados["distances"][0][i]
+    documents = resultados["documents"]
+    metadatas = resultados["metadatas"]
+    distances = resultados["distances"]
+
+    if documents is None or metadatas is None or distances is None:
+        return []
+
+    for i, doc in enumerate(documents[0]):
+        meta = metadatas[0][i]
+        distancia = distances[0][i]
         chunks.append(
             {
                 "text": doc,

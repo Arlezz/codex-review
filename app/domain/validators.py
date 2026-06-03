@@ -1,4 +1,5 @@
 import json
+from typing import Literal
 
 from app.domain.models import Issue
 
@@ -14,7 +15,7 @@ def issues_validator(issues_raw: str, total_lines: int) -> list[Issue]:
 
         issues: list[Issue] = []
 
-        severity_levels = {
+        severity_levels: dict[str, Literal["critical", "warning", "suggestion"]] = {
             "critico": "critical",
             "advertencia": "warning",
             "sugerencia": "suggestion",
@@ -29,7 +30,8 @@ def issues_validator(issues_raw: str, total_lines: int) -> list[Issue]:
                 line = int(issue.get("linea", 0))
             except Exception:
                 print(
-                    f"Advertencia: Línea no válida para el issue '{issue.get('titulo', '')}'. Se asignará línea 0."
+                    f"Advertencia: Línea no válida para el issue "
+                    f"'{issue.get('titulo', '')}'. Se asignará línea 0."
                 )
                 line = 0
 

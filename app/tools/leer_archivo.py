@@ -1,6 +1,6 @@
 def leer_archivo(file):
     try:
-        with open(file, "r") as f:
+        with open(file) as f:
             return {"content": f.read()}
     except FileNotFoundError:
         return {"error": f"El archivo {file} no se encuentra en el directorio actual."}
