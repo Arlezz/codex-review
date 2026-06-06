@@ -35,4 +35,4 @@ for archivo in project_path.rglob("*.py"):
     chunks = indexar(str(archivo), project_name)
 
     # imprimir resultado
-    print(f"✓ {archivo} — {chunks} chunks")
+    print(f"[OK] {archivo} - {chunks} chunks")

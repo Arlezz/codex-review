@@ -1,16 +1,7 @@
 import hashlib
 from pathlib import Path
 
-from chromadb import PersistentClient
-from dotenv import load_dotenv
-from sentence_transformers import SentenceTransformer
-
-load_dotenv()
-
-model = SentenceTransformer("all-MiniLM-L6-v2")
-chroma = PersistentClient(path="./chroma_db")
-
-# CHROMA_COLLECTION = os.getenv("CHROMA_COLLECTION")
+from app.infrastructure.embeddings import _get_chroma, _get_model
 
 
 def chunk_texto(texto: str, chunk_size: int = 5, overlap: int = 2) -> list[str]:
@@ -29,6 +20,10 @@ def chunk_texto(texto: str, chunk_size: int = 5, overlap: int = 2) -> list[str]:
 
 
 def indexar(path: str, project_name: str) -> int:
+
+    model = _get_model()
+    chroma = _get_chroma()
+
     content_file = Path(path).read_text(encoding="utf-8")
 
     chunk_size = 10
@@ -38,9 +33,7 @@ def indexar(path: str, project_name: str) -> int:
 
     chunks_embeddings = model.encode(chunks)
 
-    coleccion = chroma.get_or_create_collection(
-        project_name, metadata={"hnsw:space": "cosine"}
-    )
+    coleccion = chroma.get_or_create_collection(project_name, metadata={"hnsw:space": "cosine"})
 
     metadatas = []
 
@@ -55,10 +48,7 @@ def indexar(path: str, project_name: str) -> int:
         )
 
     coleccion.add(
-        ids=[
-            hashlib.md5(f"{path}:chunks_{i}".encode()).hexdigest()
-            for i in range(len(chunks))
-        ],
+        ids=[hashlib.md5(f"{path}:chunks_{i}".encode()).hexdigest() for i in range(len(chunks))],
         documents=chunks,
         embeddings=chunks_embeddings.tolist(),
         metadatas=metadatas,

@@ -10,7 +10,7 @@ from app.infrastructure.llm import code_analyzer
 from app.reports.markdown import save_report
 
 
-def pipeline(file: Path, output_dir: str | None = None) -> PipelineResult | None:
+def pipeline(file: Path, collection: str, output_dir: str | None = None) -> PipelineResult | None:
 
     print("Pipeline executed")
 
@@ -26,7 +26,7 @@ def pipeline(file: Path, output_dir: str | None = None) -> PipelineResult | None
     file_metadata = extract_file_metadata(file, file_content.content)
     query = query_context(file_metadata)
 
-    context = search_context(query) if query else []
+    context = search_context(query, collection) if query else []
 
     payload = InputModel(
         file=str(file),
@@ -40,9 +40,7 @@ def pipeline(file: Path, output_dir: str | None = None) -> PipelineResult | None
 
     issues_raw = code_analyzer(payload)
 
-    issues = issues_validator(
-        issues_raw, total_lines=len(file_content.content.splitlines())
-    )
+    issues = issues_validator(issues_raw, total_lines=len(file_content.content.splitlines()))
 
     save_report(str(file), issues, output_dir=output_dir)
 

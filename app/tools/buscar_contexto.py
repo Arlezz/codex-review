@@ -1,18 +1,18 @@
 import os
 
-from chromadb import PersistentClient
 from dotenv import load_dotenv
-from sentence_transformers import SentenceTransformer
+
+from app.infrastructure.embeddings import _get_chroma, _get_model
 
 load_dotenv()
-
-chroma = PersistentClient(path="./chroma_db")
-model = SentenceTransformer("all-MiniLM-L6-v2")
 
 CHROMA_COLLECTION = os.getenv("CHROMA_COLLECTION", "default")
 
 
 def buscar_contexto(query: str, n_resultados: int = 5) -> list[dict]:
+
+    chroma = _get_chroma()
+    model = _get_model()
 
     query_embedding = model.encode(query).tolist()
     coleccion = chroma.get_or_create_collection(

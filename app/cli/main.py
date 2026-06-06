@@ -11,14 +11,19 @@ app = typer.Typer()
 
 
 @app.command()
-def analyze(path: str):
+def analyze(
+    path: str = typer.Argument(..., help="Ruta al proyecto o al archivo"),
+    project: str = typer.Option(..., "--project", help="Nombre del proyecto"),
+):
+
+    typer.echo(f"Analizando proyecto: {project}")
 
     file_path = Path(path)
 
     issues_result = {}
 
     if file_path.is_file():
-        result = pipeline(file_path)
+        result = pipeline(file_path, project)
         if result:
             for issue in result.issues:
                 issues_result.setdefault(issue.severity, 0)
@@ -34,6 +39,7 @@ def analyze(path: str):
                 print(f"Analizando: {file}")
                 result = pipeline(
                     file,
+                    project,
                     output_dir=output_dir,
                 )
                 if result:
