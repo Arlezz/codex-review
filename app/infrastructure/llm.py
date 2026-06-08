@@ -57,10 +57,7 @@ def code_analyzer(input_model: InputModel) -> str:
 
     messages = [{"role": "user", "content": prompt}]
 
-    response = chat(
-        model=MODEL_NAME,
-        messages=messages,
-    )
+    response = chat(model=MODEL_NAME, messages=messages, think=False)
 
     return response.message.content or ""
 
