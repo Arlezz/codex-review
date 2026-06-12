@@ -11,14 +11,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ### Running
 
 ```bash
-# Interactive agent mode (chat-based review)
-python app/agente.py
-
 # CLI pipeline mode — analyze a single file or directory
-python -m app.cli.main analyze <path>
+python -m app.cli.main analyze <path> --project <name>
 
 # Index files into ChromaDB for RAG context
-python setup.py
+python setup.py --path <path> --project <name>
 ```
 
 ### Testing
@@ -50,13 +47,11 @@ pip install -e .
 
 ## Architecture
 
-The project has two operating modes sharing the same domain layer:
+Single operating mode: a deterministic pipeline. (A legacy interactive agent
+mode — `app/agente.py` + `app/tools/` — was removed; the CLI pipeline fully
+supersedes it.)
 
-### Mode 1: Interactive Agent (`app/agente.py`)
-
-Streams Ollama chat with tool-calling. The LLM orchestrates 4 tools in a mandatory order: `leer_archivo` → `buscar_contexto` → `ejecutar_tests` → `guardar_reporte`. Reports are saved to `reports/`.
-
-### Mode 2: Pipeline / CLI (`app/cli/main.py`)
+### Pipeline / CLI (`app/cli/main.py`)
 
 Deterministic batch processing. The pipeline calls each step explicitly:
 
@@ -82,14 +77,15 @@ File path
 | Infra   | `app/infrastructure/llm.py`        | Ollama integration; returns JSON array of issues                                               |
 | Infra   | `app/infrastructure/filesystem.py` | File reading with encoding detection                                                           |
 | Reports | `app/reports/markdown.py`          | Markdown report with summary table, grouped by severity                                        |
+| Infra   | `app/infrastructure/chroma.py`     | ChromaDB vector search (`search_context`)                                                      |
+| Infra   | `app/infrastructure/embeddings.py` | Lazy loaders for the embedding model and Chroma client                                         |
 | Indexer | `app/indexer.py`                   | Chunks code (10 lines, 3-line overlap), embeds with `all-MiniLM-L6-v2`, stores in ChromaDB     |
-| Tools   | `app/tools/`                       | Agent tool implementations (file read, vector search, pytest runner, report saver)             |
 
 ### Configuration
 
 Key values come from `.env`:
 
-- `MODEL_NAME` — Ollama model (default `qwen3.5:9b`)
+- `MODEL_NAME` — Ollama model (`qwen2.5:7b`; runs with `think=False`)
 - `CHROMA_COLLECTION` — ChromaDB collection name
 - `HF_TOKEN` — HuggingFace token for sentence-transformers
 
@@ -101,8 +97,8 @@ See `docs/historias_usuario.md` for full HU details, acceptance criteria and cur
 
 ## Current Status
 
-V1 complete. Working on V2 — precision improvements.
-Next HUs: HU-004, HU-007, HU-009.
+V1 and V2 complete (+ multi-project via `--project`). Working on V3 — UX.
+Next HUs: HU-016 (auto-indexing), HU-017 (indexing progress).
 
 ## Core Principle
 

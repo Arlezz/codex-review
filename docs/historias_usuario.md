@@ -15,11 +15,23 @@ LLM probabilístico     → solo razona sobre el código, no controla nada
 
 ### Stack actual
 
-- Modelo: Qwen2.5:32b via Ollama (local)
+- Modelo: Qwen2.5:7b via Ollama (local, `think=False`)
 - Embeddings: all-MiniLM-L6-v2 (sentence-transformers)
 - Vector store: ChromaDB con similitud coseno
 - CLI: entrada principal del sistema
 - Tests: pytest
+
+---
+
+## Estado actual (2026-06-12)
+
+- **V1 MVP** ✅ completo
+- **V2 Precisión** ✅ completo (+ multi-proyecto via `--project`)
+- **V3 Experiencia** 🚧 próximo — HU-016 auto-indexado, HU-017 progreso indexado
+- **V4 Integraciones** — HU-009 dedup ✅ ya hecho; HU-011/012/013 pendientes
+- Bug parseo JSON resuelto: `.env` → `qwen2.5:7b` + `chat(..., think=False)`
+
+**Pendientes sueltos:** HU-002 `.codexignore`, reporte consolidado de directorio (HU-010), flags CLI `--output`/`--stdout` (HU-014), resumen avanzado HU-015.
 
 ---
 
@@ -76,7 +88,7 @@ def descubrir_archivos(ruta: str, extensiones: set = None) -> list[Path]:
     ...
 ```
 
-**Estado:** Pendiente
+**Estado:** Implementado ✅ — `app/core/discovery.py::find_files` (rglob, exclusiones, extensiones, ignora vacíos, ordenado)
 
 ---
 
@@ -150,7 +162,7 @@ def leer_archivo(file: str) -> dict:
         return {"error": f"Error inesperado: {str(e)}"}
 ```
 
-**Estado:** Implementado ✅ — pendiente agregar límite de tamaño
+**Estado:** Implementado ✅ — `app/infrastructure/filesystem.py::read_file` incluye límite de tamaño (500KB, trunca + warning) y fallback utf-8→latin-1
 
 ---
 
@@ -246,7 +258,7 @@ Retorna SOLO esto:
   "linea": N, "descripcion": "...", "solucion": "..."}]
 ```
 
-**Estado:** Parcialmente implementado — pendiente migrar a pipeline determinístico
+**Estado:** Implementado ✅ — migrado a pipeline determinístico (`app/core/pipeline.py` llama `code_analyzer` directo, sin tool calling)
 
 ---
 
@@ -325,7 +337,7 @@ Como usuario, quiero evitar issues repetidos en el reporte.
 - Issues con mismo título y línea se consolidan
 - No existen duplicados exactos
 
-**Estado:** Pendiente
+**Estado:** Implementado ✅ — `app/domain/validators.py` deduplica por `(line, title)`
 
 ---
 
@@ -349,7 +361,7 @@ un directorio completo.
 - Un reporte por archivo analizado
 - Reporte consolidado cuando se analiza un directorio
 
-**Estado:** Parcialmente implementado ✅ — pendiente agrupación por severidad y reporte consolidado
+**Estado:** Parcialmente implementado ✅ — `app/reports/markdown.py` tiene tabla resumen + agrupación por severidad (críticos primero) + metadata. Pendiente: **reporte consolidado** de directorio (hoy genera un .md por archivo)
 
 ---
 
@@ -435,7 +447,7 @@ codex-review analyze ./app --stdout
 - Muestra resumen al finalizar
 - Exit code 0 si no hay críticos, 1 si hay críticos
 
-**Estado:** Pendiente
+**Estado:** Implementado ✅ — `app/cli/main.py` soporta archivo y directorio, `typer.progressbar`, resumen por severidad, exit codes 0/1. Requiere `--project`. Pendiente: flags `--output` y `--stdout`
 
 ---
 
@@ -451,7 +463,7 @@ Como usuario, quiero ver un resumen rápido al finalizar el análisis.
 - Archivos con más issues listados primero
 - Tiempo total de análisis
 
-**Estado:** Pendiente
+**Estado:** Parcialmente implementado — `app/cli/main.py` muestra total de archivos + issues por severidad. Pendiente: archivos con más issues primero, tiempo total
 
 ---
 
@@ -480,7 +492,7 @@ Esta HU elimina ese paso — el CLI detecta si ChromaDB está vacío y lo indexa
 - `analyze --reindex` fuerza un nuevo indexado completo
 - Si el directorio raíz no puede inferirse, se muestra error claro
 
-**Estado:** Pendiente
+**Estado:** Pendiente — hoy el indexado es manual via `python setup.py --path X --project Y`. El CLI `analyze` NO detecta colección vacía ni auto-indexa, y no existe flag `--reindex`. (El commit "auto-indexing" solo refactorizó args de `setup.py`.)
 
 ---
 
@@ -511,39 +523,41 @@ el usuario no sabe si el sistema está colgado o procesando.
 
 Usar `rich.progress` (ya disponible via Typer) o `tqdm`.
 
-**Estado:** Pendiente
+**Estado:** Pendiente — `setup.py` solo imprime `[OK] {archivo} - {chunks} chunks` por archivo. Falta: barra de progreso, `archivo X de Y`, mensaje final `Indexado completo — N archivos, X chunks`. (Nota: la progressbar de `cli/main.py` es para el *análisis*, no el indexado.)
 
 ---
 
 ## Roadmap
 
-### V1 — MVP funcional
+### V1 — MVP funcional ✅ COMPLETO
 
-- HU-001 Escaneo de directorios
+- HU-001 Escaneo de directorios ✅
 - HU-003 Lectura segura ✅
-- HU-005 Generación de issues (migrar a pipeline)
-- HU-010 Reporte Markdown ✅ parcial
-- HU-014 CLI básico
+- HU-005 Generación de issues ✅ (pipeline determinístico)
+- HU-010 Reporte Markdown ✅ (parcial — falta consolidado de directorio)
+- HU-014 CLI básico ✅
 
 **Objetivo:** Analizar un directorio completo y generar reportes desde terminal.
 
 ---
 
-### V2 — Mejora de precisión
+### V2 — Mejora de precisión ✅ COMPLETO
 
-- HU-004 Context Builder
+- HU-004 Context Builder ✅
 - HU-006 Severidad ✅
-- HU-007 Prevención de falsos positivos
-- HU-008 Validación estructural
+- HU-007 Prevención de falsos positivos ✅
+- HU-008 Validación estructural ✅
 
 **Objetivo:** Reportes confiables sin falsos positivos.
 
+**Extra completado:** Soporte multi-proyecto via `--project` (embeddings.py lazy loaders, collection requerido).
+
 ---
 
-### V3 — Experiencia de uso
+### V3 — Experiencia de uso 🚧 EN CURSO (próximo)
 
-- HU-016 Auto-indexado del proyecto
-- HU-017 Progreso de indexado
+- HU-016 Auto-indexado del proyecto — pendiente (próximo a trabajar)
+- HU-017 Progreso de indexado — pendiente
 
 **Objetivo:** El usuario no necesita saber que ChromaDB existe. El sistema se configura solo.
 
@@ -551,10 +565,10 @@ Usar `rich.progress` (ya disponible via Typer) o `tqdm`.
 
 ### V4 — Integraciones
 
-- HU-009 Deduplicación
-- HU-011 Export JSON
-- HU-012 Git Diff
-- HU-013 Linters
+- HU-009 Deduplicación ✅ (ya en validators.py)
+- HU-011 Export JSON — pendiente
+- HU-012 Git Diff — pendiente
+- HU-013 Linters — pendiente
 
 **Objetivo:** Integración con herramientas externas.
 
