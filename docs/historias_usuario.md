@@ -29,6 +29,7 @@ LLM probabilístico     → solo razona sobre el código, no controla nada
 - **V2 Precisión** ✅ completo (+ multi-proyecto via `--project`)
 - **V3 Experiencia** 🚧 próximo — HU-016 auto-indexado, HU-017 progreso indexado
 - **V4 Integraciones** — HU-009 dedup ✅ ya hecho; HU-011/012/013 pendientes
+- **V5 Calidad y robustez** 🆕 — HU-018→024 de la auditoría 2026-06-12 (HU-018/019 alta prioridad)
 - Bug parseo JSON resuelto: `.env` → `qwen2.5:7b` + `chat(..., think=False)`
 
 **Pendientes sueltos:** HU-002 `.codexignore`, reporte consolidado de directorio (HU-010), flags CLI `--output`/`--stdout` (HU-014), resumen avanzado HU-015.
@@ -492,7 +493,7 @@ Esta HU elimina ese paso — el CLI detecta si ChromaDB está vacío y lo indexa
 - `analyze --reindex` fuerza un nuevo indexado completo
 - Si el directorio raíz no puede inferirse, se muestra error claro
 
-**Estado:** Pendiente — hoy el indexado es manual via `python setup.py --path X --project Y`. El CLI `analyze` NO detecta colección vacía ni auto-indexa, y no existe flag `--reindex`. (El commit "auto-indexing" solo refactorizó args de `setup.py`.)
+**Estado:** Implementado ✅ — `cli/main.py::_ensure_indexed` (ramas `--reindex` / `count==0` / skip), `chroma.get_documents_count` + `reset_collection`, `indexer.index_project` (reúsa `find_files`). Raíz = `path` si es dir, carpeta padre si es archivo. Path inválido → error + exit 1.
 
 ---
 
@@ -524,6 +525,213 @@ el usuario no sabe si el sistema está colgado o procesando.
 Usar `rich.progress` (ya disponible via Typer) o `tqdm`.
 
 **Estado:** Pendiente — `setup.py` solo imprime `[OK] {archivo} - {chunks} chunks` por archivo. Falta: barra de progreso, `archivo X de Y`, mensaje final `Indexado completo — N archivos, X chunks`. (Nota: la progressbar de `cli/main.py` es para el *análisis*, no el indexado.)
+
+---
+
+## MÓDULO 9 — Calidad y robustez (V5)
+
+> Hallazgos de la auditoría de calidad/flujo (2026-06-12). Priorizan corregir
+> degradaciones silenciosas del producto antes de seguir sumando features.
+
+### HU-018 — Parseo robusto de la salida del LLM
+
+**Descripción**
+Como sistema, necesito interpretar la salida del LLM aunque venga envuelta en
+fences de código o con texto adicional, para no perder issues silenciosamente.
+
+**Contexto técnico**
+`validators.py` hace `json.loads(issues_raw)` directo. Qwen suele envolver el
+JSON en ```` ```json ... ``` ```` o agregar texto antes/después →
+`JSONDecodeError` → `return []`. Resultado: 0 issues sin aviso, el reporte
+aparenta que el código está perfecto. Es el bug de mayor impacto del producto.
+
+**Alcance**
+
+- Forzar salida JSON desde Ollama (`chat(..., format="json")`) en `llm.py`
+- Como respaldo: strip de fences + extracción del primer array `[...]`
+- Diferenciar "sin issues" (`[]` real) de "fallo de parseo"
+
+**Criterios de aceptación**
+
+- JSON envuelto en fences se parsea correctamente
+- JSON con texto antes/después se extrae correctamente
+- Un fallo real de parseo se registra/marca, no se confunde con "sin issues"
+- `[]` legítimo sigue significando "sin issues"
+
+**Estado:** Pendiente — prioridad alta
+
+---
+
+### HU-019 — Resiliencia del pipeline
+
+**Descripción**
+Como usuario, quiero que un archivo problemático o una caída de Ollama no aborte
+el análisis del directorio completo.
+
+**Contexto técnico**
+`pipeline.py` llama `code_analyzer` sin try/except. Un fallo (Ollama caído,
+archivo raro) propaga la excepción y mata el batch (`cli/main.py`). Además, un
+path inexistente cae sin rama → "Análisis completo", exit 0 (no-op silencioso).
+La llamada a Ollama no tiene timeout ni reintento.
+
+**Alcance**
+
+- try/except por archivo en el pipeline; acumular fallos y continuar
+- Validar que el path exista; error claro + exit 1 si no
+- Timeout y manejo de error en la llamada a Ollama (`llm.py`)
+- Resumen final lista archivos que fallaron
+
+**Criterios de aceptación**
+
+- Un archivo que falla no detiene el resto del directorio
+- Path inválido produce error claro y exit code distinto de 0
+- Caída de Ollama se reporta como error, no como crash
+- El resumen indica cuántos archivos fallaron
+
+**Estado:** Pendiente — prioridad alta
+
+---
+
+### HU-020 — Soporte multilenguaje real (JS/TS)
+
+**Descripción**
+Como usuario, quiero que los archivos JS/TS se indexen y se les extraiga metadata,
+no solo Python.
+
+**Contexto técnico**
+`discovery.py` descubre `.js/.ts/.jsx/.tsx`, pero `setup.py` solo indexa `*.py`
+y `context_builder._EXTRACTORS` solo tiene extractor de Python. Para archivos
+JS/TS: sin RAG, sin imports/funciones/clases. Incumple el alcance de HU-004.
+
+**Alcance**
+
+- Indexar también `.js/.ts/.jsx/.tsx` (reusar `find_files`)
+- Extractor para JS/TS: `import`, `function`, `class`, `interface`
+- Detección de lenguaje ya soportada en `EXTENSIONS`
+
+**Criterios de aceptación**
+
+- Un proyecto JS/TS se indexa completo
+- Para TS/JS se detectan import/function/class/interface
+- El contexto RAG funciona en proyectos JS/TS
+
+**Estado:** Pendiente
+
+---
+
+### HU-021 — Deduplicación de infraestructura
+
+**Descripción**
+Como mantenedor, quiero eliminar lógica duplicada y costos de import innecesarios
+para reducir divergencias y acelerar el arranque.
+
+**Contexto técnico**
+Varios duplicados detectados:
+- `setup.py` reimplementa rglob + exclusiones que ya están en `find_files`
+- `indexer.py` lee solo utf-8 (sin fallback); `filesystem.read_file` ya resuelve encoding + límite
+- `infrastructure/__init__.py` importa `embeddings` de forma ansiosa → carga `sentence_transformers`/`torch` aunque solo se use `filesystem`
+- Parámetros de chunking duplicados: `chunk_texto(5,2)` vs `indexar(10,3)`
+- Literal `{"hnsw:space": "cosine"}` repetido en `chroma.py` e `indexer.py`
+
+**Alcance**
+
+- `setup.py` reusa `find_files`
+- `indexer.py` reusa `read_file`
+- Vaciar `infrastructure/__init__.py` (imports lazy)
+- Una sola fuente para parámetros de chunking
+- Constante compartida para metadata de colección
+
+**Criterios de aceptación**
+
+- No hay dos lugares con reglas de descubrimiento de archivos
+- Indexado no crashea con archivos no-utf8
+- Importar `read_file` no carga torch
+- Chunking tiene una sola configuración
+
+**Estado:** Pendiente
+
+---
+
+### HU-022 — Logging y configuración central
+
+**Descripción**
+Como mantenedor, quiero logging con niveles y un único punto de configuración,
+en vez de `print` dispersos y `os.getenv` repartido.
+
+**Contexto técnico**
+Hay `print` de debug (`pipeline.py` → `"Pipeline executed"`) y prints dispersos
+en cli/pipeline/discovery/validators. Las env vars se leen sueltas en `llm.py`,
+`embeddings.py`, `setup.py`.
+
+**Alcance**
+
+- Módulo `logging` con niveles (info/warning/error)
+- Quitar prints de debug
+- Módulo `settings`/`config` central que centralice env vars
+
+**Criterios de aceptación**
+
+- No quedan `print` de debug en el código
+- Nivel de log configurable
+- Las env vars se leen en un solo módulo
+
+**Estado:** Pendiente
+
+---
+
+### HU-023 — Consistencia de modelos y naming
+
+**Descripción**
+Como mantenedor, quiero nombres y type hints consistentes para evitar confusión.
+
+**Contexto técnico**
+- `InputModel.clases` (español) junto a `functions`/`imports` (inglés)
+- Type hint mentiroso: `functions: list[dict[str, list[str]]]` pero `name` es `str`
+- Literal de metadata de colección duplicado
+- UX CLI: resumen solo en rama directorio, no en archivo único; `print` dentro del loop pisa el `typer.progressbar`
+
+**Alcance**
+
+- Unificar naming (preferir inglés en el dominio)
+- Corregir type hints de `InputModel`
+- Mostrar resumen también para archivo único
+- Evitar prints dentro del progressbar
+
+**Criterios de aceptación**
+
+- Naming consistente en `models.py`
+- Type hints reflejan la estructura real
+- Resumen visible en archivo y directorio
+- La barra de progreso no se corrompe con prints
+
+**Estado:** Pendiente
+
+---
+
+### HU-024 — Suite de tests del camino crítico
+
+**Descripción**
+Como mantenedor, quiero tests sobre el flujo central para detectar regresiones.
+
+**Contexto técnico**
+Hoy solo hay tests de `validators`, `context_builder`, `indexer`. Cero cobertura
+en `pipeline`, `cli`, `llm`, `chroma`, `markdown`. No hay test que cubra el bug
+de parseo de fences (HU-018).
+
+**Alcance**
+
+- Test de `pipeline` con LLM mockeado
+- Test de parseo robusto (fences, texto extra) — cubre HU-018
+- Test de `cli` (path válido/inválido, exit codes)
+- Test de `markdown` (estructura del reporte)
+
+**Criterios de aceptación**
+
+- El camino crítico tiene cobertura de tests
+- Existe test que falla si reaparece el bug de fences
+- Los exit codes del CLI están testeados
+
+**Estado:** Pendiente
 
 ---
 
@@ -571,6 +779,21 @@ Usar `rich.progress` (ya disponible via Typer) o `tqdm`.
 - HU-013 Linters — pendiente
 
 **Objetivo:** Integración con herramientas externas.
+
+---
+
+### V5 — Calidad y robustez
+
+- HU-018 Parseo robusto de salida LLM — **alta prioridad**
+- HU-019 Resiliencia del pipeline — **alta prioridad**
+- HU-020 Soporte multilenguaje real (JS/TS)
+- HU-021 Deduplicación de infraestructura
+- HU-022 Logging y configuración central
+- HU-023 Consistencia de modelos y naming
+- HU-024 Suite de tests del camino crítico
+
+**Objetivo:** Eliminar degradaciones silenciosas del producto y reducir deuda
+técnica antes de seguir sumando integraciones.
 
 ---
 

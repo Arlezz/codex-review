@@ -3,22 +3,72 @@ from datetime import datetime
 from pathlib import Path
 
 import typer
+from rich.progress import (
+    BarColumn,
+    MofNCompleteColumn,
+    Progress,
+    TextColumn,
+    TimeElapsedColumn,
+    TimeRemainingColumn,
+)
 
 from app.core.discovery import find_files
 from app.core.pipeline import pipeline
+from app.indexer import index_project
+from app.infrastructure.chroma import get_documents_count, reset_collection
 
 app = typer.Typer()
+
+progress_bar = Progress(
+    TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
+    BarColumn(),
+    MofNCompleteColumn(),
+    TextColumn("•"),
+    TimeElapsedColumn(),
+    TextColumn("•"),
+    TimeRemainingColumn(),
+)
+
+
+def _ensure_indexed(project: str, root: Path, reindex: bool) -> None:
+
+    with progress_bar as progress:
+        task = progress.add_task("Indexando...", total=None)
+
+        if reindex:
+            print("Reindexando...")
+            reset_collection(project)
+            index_project(
+                str(root),
+                project,
+                on_progress=lambda actual, total, nombre: progress.update(
+                    task, completed=actual, total=total, description=f"Indexando... {nombre}"
+                ),
+            )
+        elif get_documents_count(project) == 0:
+            print("Indexando...")
+            index_project(str(root), project)
 
 
 @app.command()
 def analyze(
     path: str = typer.Argument(..., help="Ruta al proyecto o al archivo"),
     project: str = typer.Option(..., "--project", help="Nombre del proyecto"),
+    reindex: bool = typer.Option(
+        False, "--reindex", help="Reindexar el proyecto antes de analizar"
+    ),
 ):
+    file_path = Path(path)
+
+    if not file_path.exists():
+        typer.echo(f"El archivo o directorio {path} no existe")
+        raise typer.Exit(code=1)
 
     typer.echo(f"Analizando proyecto: {project}")
 
-    file_path = Path(path)
+    project_root = file_path if file_path.is_dir() else file_path.parent
+
+    _ensure_indexed(project, project_root, reindex)
 
     issues_result = {}
 

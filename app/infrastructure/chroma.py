@@ -1,4 +1,4 @@
-from app.infrastructure.embeddings import _get_chroma, _get_model
+from app.infrastructure.embeddings import _get_chroma, _get_chroma_metadata, _get_model
 
 
 def search_context(query: str, collection: str, n_resultados: int = 5) -> list[dict]:
@@ -7,7 +7,7 @@ def search_context(query: str, collection: str, n_resultados: int = 5) -> list[d
     chroma = _get_chroma()
 
     query_embedding = model.encode(query).tolist()
-    coleccion = chroma.get_or_create_collection(collection, metadata={"hnsw:space": "cosine"})
+    coleccion = chroma.get_or_create_collection(collection, metadata=_get_chroma_metadata())
 
     if coleccion.count() == 0:
         return []
@@ -41,3 +41,16 @@ def search_context(query: str, collection: str, n_resultados: int = 5) -> list[d
         )
 
     return chunks
+
+
+def get_documents_count(collection: str) -> int:
+    chroma = _get_chroma()
+    if collection in [c.name for c in chroma.list_collections()]:
+        return chroma.get_collection(collection).count()
+    return 0
+
+
+def reset_collection(collection: str) -> None:
+    chroma = _get_chroma()
+    if collection in [c.name for c in chroma.list_collections()]:
+        chroma.delete_collection(collection)

@@ -1,10 +1,13 @@
+import enum
 import hashlib
+from collections.abc import Callable
 from pathlib import Path
 
-from app.infrastructure.embeddings import _get_chroma, _get_model
+from app.core.discovery import find_files
+from app.infrastructure.embeddings import _get_chroma, _get_chroma_metadata, _get_model
 
 
-def chunk_texto(texto: str, chunk_size: int = 5, overlap: int = 2) -> list[str]:
+def chunk_texto(texto: str, chunk_size: int = 10, overlap: int = 3) -> list[str]:
     lineas = texto.splitlines()
     chunks = []
     i = 0
@@ -26,16 +29,15 @@ def indexar(path: str, project_name: str) -> int:
 
     content_file = Path(path).read_text(encoding="utf-8")
 
-    chunk_size = 10
-    overlap = 3
-
-    chunks = chunk_texto(content_file, chunk_size, overlap)
+    chunks = chunk_texto(content_file)
 
     chunks_embeddings = model.encode(chunks)
 
-    coleccion = chroma.get_or_create_collection(project_name, metadata={"hnsw:space": "cosine"})
+    coleccion = chroma.get_or_create_collection(project_name, metadata=_get_chroma_metadata())
 
     metadatas = []
+    chunk_size = 10
+    overlap = 3
 
     for i in range(len(chunks)):
         linea_inicio = i * (chunk_size - overlap) + 1
@@ -55,3 +57,23 @@ def indexar(path: str, project_name: str) -> int:
     )
 
     return len(chunks)
+
+
+def index_project(
+    root: str, project_name: str, on_progress: Callable[[int, int, str], None] | None = None
+) -> tuple[int, int]:
+    files = find_files(root)
+    total_files = len(files)
+
+    total_chunks = 0
+
+    if not files:
+        return (0, 0)
+
+    for i, file in enumerate(files, 1):
+        chunks = indexar(str(file), project_name)
+        total_chunks += chunks
+        if on_progress:
+            on_progress(i, total_files, file.name)
+
+    return (total_files, total_chunks)

@@ -1,4 +1,5 @@
 import os
+import re
 
 from chromadb import PersistentClient
 from dotenv import load_dotenv
@@ -22,3 +23,11 @@ def _get_chroma():
     if _chroma is None:
         _chroma = PersistentClient(path=os.getenv("CHROMA_DB_PATH", "./chroma_db"))
     return _chroma
+
+
+def _get_chroma_metadata() -> dict:
+    return {
+        "hnsw:space": "cosine",
+        # "hnsw:ef_construction": 200,
+        # "hnsw:m": 16,
+    }
