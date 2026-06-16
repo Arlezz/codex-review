@@ -17,6 +17,12 @@ class Issue:
     description: str
     solution: str
     line: int = 0
+    code_example: str = ""
+
+
+@dataclass
+class IssuesResult:
+    issues: list[Issue]
 
 
 @dataclass

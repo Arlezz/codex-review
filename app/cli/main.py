@@ -1,3 +1,4 @@
+import re
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -19,6 +20,13 @@ from app.infrastructure.chroma import get_documents_count, reset_collection
 
 app = typer.Typer()
 
+
+@app.callback()
+def main():
+    """Code review agent"""
+    pass
+
+
 progress_bar = Progress(
     TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
     BarColumn(),
@@ -32,22 +40,42 @@ progress_bar = Progress(
 
 def _ensure_indexed(project: str, root: Path, reindex: bool) -> None:
 
-    with progress_bar as progress:
-        task = progress.add_task("Indexando...", total=None)
+    files = find_files(str(root))
+    files_count = len(files)
 
-        if reindex:
-            print("Reindexando...")
-            reset_collection(project)
-            index_project(
+    if files_count == 0:
+        typer.echo(f"No se encontraron archivos en {root}")
+        raise typer.Exit(code=1)
+
+    if not reindex and get_documents_count(project) > 0:
+        print("Proyecto ya indexado, saltando indexación...")
+        return
+
+    if reindex:
+        reset_collection(project)
+
+    if files_count > 1:
+        with progress_bar as progress:
+            task = progress.add_task("Indexando...", total=None)
+
+            def callback(actual, total, nombre):
+                progress.update(
+                    task, completed=actual, total=total, description=f"Indexando... {nombre}"
+                )
+
+            result = index_project(
                 str(root),
                 project,
-                on_progress=lambda actual, total, nombre: progress.update(
-                    task, completed=actual, total=total, description=f"Indexando... {nombre}"
-                ),
+                on_progress=callback,
             )
-        elif get_documents_count(project) == 0:
-            print("Indexando...")
-            index_project(str(root), project)
+
+        print(f"Indexado completo - {result[0]} archivos, {result[1]} chunks")
+        return
+
+    print("Indexando archivo...")
+    result = index_project(str(root), project, on_progress=None)
+    print(f"Indexado completo - {result[0]} archivos, {result[1]} chunks")
+    return
 
 
 @app.command()

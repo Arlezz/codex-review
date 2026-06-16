@@ -38,15 +38,15 @@ def pipeline(file: Path, collection: str, output_dir: str | None = None) -> Pipe
         code=file_content.content,
     )
 
-    issues_raw = code_analyzer(payload)
+    issues = code_analyzer(payload)
 
-    issues = issues_validator(issues_raw, total_lines=len(file_content.content.splitlines()))
+    issues_validated = issues_validator(issues, total_lines=len(file_content.content.splitlines()))
 
-    save_report(str(file), issues, output_dir=output_dir)
+    save_report(str(file), issues_validated, output_dir=output_dir)
 
     return PipelineResult(
         file=str(file),
-        issues=issues,
+        issues=issues_validated,
         timestamp=datetime.now(),
         # meta={"issues": issues},
     )
