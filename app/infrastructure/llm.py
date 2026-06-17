@@ -36,7 +36,7 @@ El N: es referencia, no parte del código.
 IMPORTANTE:
 - Antes de reportar un issue, verifica que el problema realmente esté presente en el código. 
 - No reportes como issue algo que ya está implementado correctamente.
-- Si no encontrás ningún problema, retorná {{"issues": []}}.
+- Si no encuentras ningún problema, retorna {{"issues": []}}.
 - En code_example incluye únicamente el código, sin envolverlo en bloques markdown 
 ni usar comillas triples (```)
 
