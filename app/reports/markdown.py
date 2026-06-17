@@ -4,6 +4,13 @@ from pathlib import Path
 
 from app.domain.models import Issue
 
+SEVERITY_LABELS = {
+    "critical": "Crítico",
+    "warning": "Advertencia",
+    "suggestion": "Sugerencia",
+}
+SEVERITY_ORDER = {sev: i for i, sev in enumerate(SEVERITY_LABELS)}
+
 
 def save_report(
     archivo_revisado: str,
@@ -12,45 +19,36 @@ def save_report(
     language: str = "unknown",
 ) -> dict:
 
-    if output_dir is None:
-        output_dir = "generated_reports"
-
+    output_dir = output_dir or "generated_reports"
     file_path = Path(archivo_revisado)
-
-    reporte = Path(f"{output_dir}/reporte_{file_path.name}.md")
+    reporte = Path(output_dir) / f"reporte_{file_path.name}.md"
     reporte.parent.mkdir(parents=True, exist_ok=True)
 
-    report_lines = []
-
-    report_lines.append(f"# Code Review — {archivo_revisado}")
-    report_lines.append(f"**Total de issues detectados:** {len(issues)}")
-    report_lines.append(f"**Fecha del reporte:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-    report_lines.append("")
-
-    severity_order = {"critical": 0, "warning": 1, "suggestion": 2}
-
-    sorted_issues = sorted(issues, key=lambda issue: severity_order.get(issue.severity, 99))
-
+    sorted_issues = sorted(issues, key=lambda issue: SEVERITY_ORDER.get(issue.severity, 99))
     conteos = Counter(issue.severity for issue in issues)
+    fence_lang = "" if language == "unknown" else language
 
-    fence_lang = language if language != "unknown" else ""
-
-    report_lines.append("## Resumen:")
-    report_lines.append("| Severidad | Total |")
-    report_lines.append("|-------------|-------|")
-    report_lines.append(f"| Crítico | {conteos['critical']} |")
-    report_lines.append(f"| Advertencia | {conteos['warning']} |")
-    report_lines.append(f"| Sugerencia | {conteos['suggestion']} |")
+    report_lines = [
+        f"# Code Review — {archivo_revisado}",
+        f"**Total de issues detectados:** {len(issues)}",
+        f"**Fecha del reporte:** {datetime.now():%Y-%m-%d %H:%M:%S}",
+        "",
+        "## Resumen",
+        "| Severidad | Total |",
+        "|-----------|-------|",
+    ]
+    for severity, label in SEVERITY_LABELS.items():
+        report_lines.append(f"| {label} | {conteos.get(severity, 0)} |")
     report_lines.append("")
 
     for i, issue in enumerate(sorted_issues, 1):
         report_lines.append(f"## {i}. {issue.title} (línea {issue.line})")
-        report_lines.append(f"**Severidad:** {issue.severity}")
+        report_lines.append(f"**Severidad:** {SEVERITY_LABELS.get(issue.severity, issue.severity)}")
         report_lines.append("")
-        report_lines.append("**Descripcion:**")
+        report_lines.append("**Descripción:**")
         report_lines.append(issue.description)
         report_lines.append("")
-        report_lines.append("**Solucion:**")
+        report_lines.append("**Solución:**")
         report_lines.append(issue.solution)
         if issue.code_example:
             report_lines.append("")
@@ -62,7 +60,6 @@ def save_report(
         report_lines.append("")
 
     texto_markdown = "\n".join(report_lines)
-
     reporte.write_text(texto_markdown, encoding="utf-8")
 
     return {
