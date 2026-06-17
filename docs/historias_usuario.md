@@ -558,7 +558,9 @@ aparenta que el código está perfecto. Es el bug de mayor impacto del producto.
 - Un fallo real de parseo se registra/marca, no se confunde con "sin issues"
 - `[]` legítimo sigue significando "sin issues"
 
-**Estado:** Pendiente — prioridad alta
+**Estado:** ✅ Completo (2026-06-17). `format=schema` ya cubría fences/texto extra/`[]`.
+Cascada en `llm.py::code_analyzer`: validate → `json_repair` → retry temp 0.3 (cap 1) →
+log `[PARSE FAILED]` + `return []`. Falta solo propagar el fallo al reporte → HU-019.
 
 ---
 
@@ -784,7 +786,7 @@ de parseo de fences (HU-018).
 
 ### V5 — Calidad y robustez
 
-- HU-018 Parseo robusto de salida LLM — **alta prioridad**
+- HU-018 Parseo robusto de salida LLM — ✅ **completo**
 - HU-019 Resiliencia del pipeline — **alta prioridad**
 - HU-020 Soporte multilenguaje real (JS/TS)
 - HU-021 Deduplicación de infraestructura

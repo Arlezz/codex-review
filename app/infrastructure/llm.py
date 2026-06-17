@@ -1,6 +1,7 @@
 import os
 
 from dotenv import load_dotenv
+from json_repair import repair_json
 from ollama import chat
 from pydantic import TypeAdapter, ValidationError
 
@@ -56,7 +57,9 @@ Retorna SOLO esto:
 """
 
 
-def code_analyzer(input_model: InputModel) -> list[Issue]:
+def code_analyzer(
+    input_model: InputModel, temperature: float = 0.0, _attempt: int = 0
+) -> list[Issue]:
 
     prompt = TEMPLATE_PROMPT.format(
         path=input_model.file,
@@ -73,19 +76,30 @@ def code_analyzer(input_model: InputModel) -> list[Issue]:
     messages = [{"role": "user", "content": prompt}]
 
     response = chat(
-        model=MODEL_NAME, messages=messages, think=False, format=schema, options={"temperature": 0}
+        model=MODEL_NAME,
+        messages=messages,
+        think=False,
+        format=schema,
+        options={"temperature": temperature},
     )
 
     content = response.message.content or '{"issues": []}'
-
-    print(content)
 
     try:
         result = adapter.validate_json(content)
         return result.issues
     except ValidationError:
-        print("Error: No se pudo parsear el JSON de issues. ")
-        return []
+        repaired = repair_json(content)
+
+        try:
+            result = adapter.validate_json(repaired)
+            return result.issues
+        except ValidationError as e:
+            if _attempt < 1:
+                return code_analyzer(input_model, temperature=0.3, _attempt=_attempt + 1)
+            else:
+                print(f"[PARSE FAILED] {e!r}\nContent: {content}")
+                return []
 
 
 def _format_rag(chunks: list[dict[str, str | int | float]]) -> str:
