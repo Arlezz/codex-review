@@ -42,7 +42,7 @@ def pipeline(file: Path, collection: str, output_dir: str | None = None) -> Pipe
 
     issues_validated = issues_validator(issues, total_lines=len(file_content.content.splitlines()))
 
-    save_report(str(file), issues_validated, output_dir=output_dir)
+    save_report(str(file), issues_validated, output_dir=output_dir, language=payload.language)
 
     return PipelineResult(
         file=str(file),

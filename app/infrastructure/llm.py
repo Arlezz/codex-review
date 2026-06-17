@@ -33,10 +33,12 @@ El N: es referencia, no parte del código.
 {codigo}
 
 IMPORTANTE:
-Antes de reportar un issue, verifica que el problema realmente esté presente en el código. 
-No reportes como issue algo que ya está implementado correctamente.
+- Antes de reportar un issue, verifica que el problema realmente esté presente en el código. 
+- No reportes como issue algo que ya está implementado correctamente.
+- Si no encontrás ningún problema, retorná {{"issues": []}}.
+- En code_example incluye únicamente el código, sin envolverlo en bloques markdown 
+ni usar comillas triples (```)
 
-Si no encontrás ningún problema, retorná {{"issues": []}}.
 Retorna SOLO esto:
 {{
     "issues": [
@@ -45,7 +47,7 @@ Retorna SOLO esto:
             "severity": "critical | warning | suggestion",
             "line": N,
             "description": "...",
-            "solution": "..."
+            "solution": "...",
             "code_example": "..."
         }}
     ]

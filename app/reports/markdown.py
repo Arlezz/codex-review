@@ -6,7 +6,10 @@ from app.domain.models import Issue
 
 
 def save_report(
-    archivo_revisado: str, issues: list[Issue], output_dir: str | None = None
+    archivo_revisado: str,
+    issues: list[Issue],
+    output_dir: str | None = None,
+    language: str = "unknown",
 ) -> dict:
 
     if output_dir is None:
@@ -21,18 +24,16 @@ def save_report(
 
     report_lines.append(f"# Code Review — {archivo_revisado}")
     report_lines.append(f"**Total de issues detectados:** {len(issues)}")
-    report_lines.append(
-        f"**Fecha del reporte:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
-    )
+    report_lines.append(f"**Fecha del reporte:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     report_lines.append("")
 
     severity_order = {"critical": 0, "warning": 1, "suggestion": 2}
 
-    sorted_issues = sorted(
-        issues, key=lambda issue: severity_order.get(issue.severity, 99)
-    )
+    sorted_issues = sorted(issues, key=lambda issue: severity_order.get(issue.severity, 99))
 
     conteos = Counter(issue.severity for issue in issues)
+
+    fence_lang = language if language != "unknown" else ""
 
     report_lines.append("## Resumen:")
     report_lines.append("| Severidad | Total |")
@@ -51,6 +52,12 @@ def save_report(
         report_lines.append("")
         report_lines.append("**Solucion:**")
         report_lines.append(issue.solution)
+        if issue.code_example:
+            report_lines.append("")
+            report_lines.append("**Ejemplo:**")
+            report_lines.append(f"```{fence_lang}")
+            report_lines.append(issue.code_example)
+            report_lines.append("```")
         report_lines.append("---")
         report_lines.append("")
 
