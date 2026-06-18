@@ -1,8 +1,6 @@
 from datetime import datetime
 from pathlib import Path
 
-from torch.cuda import temperature
-
 from app.core.context_builder import extract_file_metadata, query_context
 from app.domain.models import InputModel, PipelineResult
 from app.domain.validators import issues_validator

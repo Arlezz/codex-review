@@ -1,4 +1,3 @@
-import re
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -98,14 +97,20 @@ def analyze(
 
     _ensure_indexed(project, project_root, reindex)
 
+    failed: list[tuple[Path, str]] = []
     issues_result = {}
 
     if file_path.is_file():
-        result = pipeline(file_path, project)
-        if result:
-            for issue in result.issues:
-                issues_result.setdefault(issue.severity, 0)
-                issues_result[issue.severity] += 1
+        try:
+            result = pipeline(file_path, project)
+            if result:
+                for issue in result.issues:
+                    issues_result.setdefault(issue.severity, 0)
+                    issues_result[issue.severity] += 1
+            else:
+                failed.append((file_path, "Sin resultados, no se pudo analizar."))
+        except Exception as e:
+            failed.append((file_path, str(e)))
 
     elif file_path.is_dir():
         files = find_files(path)
@@ -115,24 +120,35 @@ def analyze(
         with typer.progressbar(files, label="Analizando archivos") as progress:
             for file in progress:
                 print(f"Analizando: {file}")
-                result = pipeline(
-                    file,
-                    project,
-                    output_dir=output_dir,
-                )
-                if result:
-                    for issue in result.issues:
-                        issues_result.setdefault(issue.severity, 0)
-                        issues_result[issue.severity] += 1
+
+                try:
+                    result = pipeline(
+                        file,
+                        project,
+                        output_dir=output_dir,
+                    )
+                    if result:
+                        for issue in result.issues:
+                            issues_result.setdefault(issue.severity, 0)
+                            issues_result[issue.severity] += 1
+                    else:
+                        failed.append((file, "Sin resultados, no se pudo analizar."))
+                except Exception as e:
+                    failed.append((file, str(e)))
 
     print("\nAnálisis completo.")
     if file_path.is_dir():
-        print(f"Total de archivos analizados: {len(files)}")
+        print(f"Total de archivos analizados: {len(files) - len(failed)}")
         print("\nResumen de problemas encontrados:")
         for severity, count in issues_result.items():
             print(f"  {severity.capitalize()}: {count}")
 
-    if issues_result.get("critical", 0) > 0:
+    if failed:
+        print("\nErrores encontrados:")
+        for file, error in failed:
+            print(f"  {file}: {error}")
+
+    if issues_result.get("critical", 0) > 0 or failed:
         sys.exit(1)
 
     sys.exit(0)
