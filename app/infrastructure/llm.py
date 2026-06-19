@@ -106,11 +106,6 @@ def code_analyzer(
         },
     )
 
-    print("=== THINKING ===")
-    print(response.message.thinking)
-    print("=== CONTENT ===")
-    print(response.message.content)
-
     content = response.message.content or '{"issues": []}'
 
     try:
