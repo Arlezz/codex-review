@@ -26,15 +26,17 @@ def main():
     pass
 
 
-progress_bar = Progress(
-    TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
-    BarColumn(),
-    MofNCompleteColumn(),
-    TextColumn("•"),
-    TimeElapsedColumn(),
-    TextColumn("•"),
-    TimeRemainingColumn(),
-)
+def make_progress_bar() -> Progress:
+    return Progress(
+        TextColumn("[progress.description]{task.description}"),
+        TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
+        BarColumn(),
+        MofNCompleteColumn(),
+        TextColumn("•"),
+        TimeElapsedColumn(),
+        TextColumn("•"),
+        TimeRemainingColumn(),
+    )
 
 
 def _ensure_indexed(project: str, root: Path, reindex: bool) -> None:
@@ -54,7 +56,7 @@ def _ensure_indexed(project: str, root: Path, reindex: bool) -> None:
         reset_collection(project)
 
     if files_count > 1:
-        with progress_bar as progress:
+        with make_progress_bar() as progress:
             task = progress.add_task("Indexando...", total=None)
 
             def callback(actual, total, nombre):
@@ -117,10 +119,10 @@ def analyze(
         timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         output_dir = f"generated_reports/{file_path.name}_{timestamp}"
         print(f"Archivos encontrados: {len(files)}")
-        with typer.progressbar(files, label="Analizando archivos") as progress:
-            for file in progress:
-                print(f"Analizando: {file}")
-
+        with make_progress_bar() as progress:
+            task = progress.add_task("Analizando archivos", total=len(files))
+            for file in files:
+                progress.console.print(f"Analizando: {file}")
                 try:
                     result = pipeline(
                         file,
@@ -135,6 +137,8 @@ def analyze(
                         failed.append((file, "Sin resultados, no se pudo analizar."))
                 except Exception as e:
                     failed.append((file, str(e)))
+                finally:
+                    progress.update(task, advance=1)
 
     print("\nAnálisis completo.")
     if file_path.is_dir():
