@@ -16,7 +16,7 @@ class Issue:
     severity: Literal["critical", "warning", "suggestion"]
     description: str
     solution: str
-    line: int = 0
+    line: int
     code_example: str = ""
 
 

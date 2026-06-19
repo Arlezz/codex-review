@@ -10,13 +10,19 @@ from app.domain.models import InputModel, Issue, IssuesResult
 load_dotenv()
 
 MODEL_NAME = os.getenv("MODEL_NAME", "qwen3.5:9b-q8_0")
-OLLAMA_TIMEOUT = os.getenv("OLLAMA_TIMEOUT", 120)
+THINK_ENABLED = os.getenv("THINK_ENABLED", "true").lower() == "true"
+OLLAMA_TIMEOUT = int(os.getenv("OLLAMA_TIMEOUT", 120))
+CONTEXT_WINDOW = int(os.getenv("CONTEXT_WINDOW", 16384))
+OUTPUT_TOKENS = int(os.getenv("OUTPUT_TOKENS", 8192))
+TEMPERATURE = float(os.getenv("TEMPERATURE", 0.6))
+TOP_P = float(os.getenv("TOP_P", 0.95))
+TOP_K = int(os.getenv("TOP_K", 20))
 
 
 adapter = TypeAdapter(IssuesResult)
 schema = adapter.json_schema()
 
-client = Client(timeout=int(OLLAMA_TIMEOUT))
+client = Client(timeout=OLLAMA_TIMEOUT)
 
 TEMPLATE_PROMPT = """
 Analiza el siguiente código y retorna SOLO un objeto JSON con la clave "issues".
@@ -27,11 +33,20 @@ Lenguaje: {lenguaje}
 Imports detectados: {imports}
 Funciones detectadas: {funciones}
 Clases detectadas: {clases}
-Contexto relacionado del proyecto: {rag}
 
-Código:
-El código viene con número de línea al inicio (N:). 
-Usa ese número en el campo line. 
+Contexto relacionado del proyecto (puede incluir fragmentos de OTRAS partes 
+del archivo o de OTROS archivos, recuperados por similitud semántica).
+Estos fragmentos son solo referencia de contexto general: pueden solaparse 
+entre sí y NO debes usar su numeración de líneas para nada relacionado 
+al bloque "Código" de abajo.
+{rag}
+
+Código a analizar:
+El código viene con número de línea al inicio (N:).
+Usa ÚNICAMENTE esta numeración (la del bloque "Código a analizar") para 
+el campo line. Ignora cualquier número de línea mencionado en el contexto 
+del proyecto de arriba: pertenece a otros fragmentos y puede no coincidir 
+con este bloque.
 El N: es referencia, no parte del código.
 {codigo}
 
@@ -60,7 +75,7 @@ Retorna SOLO esto:
 
 
 def code_analyzer(
-    input_model: InputModel, temperature: float = 0.0, _attempt: int = 0
+    input_model: InputModel, temperature: float = TEMPERATURE, _attempt: int = 0
 ) -> list[Issue]:
 
     prompt = TEMPLATE_PROMPT.format(
@@ -80,10 +95,21 @@ def code_analyzer(
     response = client.chat(
         model=MODEL_NAME,
         messages=messages,
-        think=False,
+        think=THINK_ENABLED,
         format=schema,
-        options={"temperature": temperature},
+        options={
+            "temperature": temperature,
+            "top_p": TOP_P,
+            "top_k": TOP_K,
+            "num_ctx": CONTEXT_WINDOW,
+            "num_predict": OUTPUT_TOKENS,
+        },
     )
+
+    print("=== THINKING ===")
+    print(response.message.thinking)
+    print("=== CONTENT ===")
+    print(response.message.content)
 
     content = response.message.content or '{"issues": []}'
 
@@ -98,7 +124,7 @@ def code_analyzer(
             return result.issues
         except ValidationError as e:
             if _attempt < 1:
-                return code_analyzer(input_model, temperature=0.3, _attempt=_attempt + 1)
+                return code_analyzer(input_model, _attempt=_attempt + 1)
             else:
                 print(f"[PARSE FAILED] {e!r}\nContent: {content}")
                 raise ValueError(f"No se pudo parsear la respuesta del modelo: {e}") from e
@@ -106,16 +132,17 @@ def code_analyzer(
 
 def _format_rag(chunks: list[dict[str, str | int | float]]) -> str:
 
-    rag_formatted = ""
-
     if not chunks:
         return "Sin contexto disponible."
 
+    rag_formatted = ""
+
     for chunk in chunks:
         rag_formatted += (
-            f"--- {chunk['path']} "
-            f"(lineas {chunk['linea_inicio']} - {chunk['linea_fin']}, "
-            f"relevancia {chunk['relevancia']}) ---\n"
+            f"--- Fragmento de contexto (no autoritativo para numeración) "
+            f"de {chunk['path']} "
+            f"[rango aproximado original: {chunk['linea_inicio']}-{chunk['linea_fin']}, "
+            f"relevancia {chunk['relevancia']}] ---\n"
         )
         rag_formatted += str(chunk["text"]) + "\n"
 

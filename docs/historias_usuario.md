@@ -27,7 +27,7 @@ LLM probabilístico     → solo razona sobre el código, no controla nada
 
 - **V1 MVP** ✅ completo
 - **V2 Precisión** ✅ completo (+ multi-proyecto via `--project`)
-- **V3 Experiencia** 🚧 próximo — HU-016 auto-indexado, HU-017 progreso indexado
+- **V3 Experiencia** ✅ completo — HU-016 auto-indexado, HU-017 progreso indexado (limpieza `setup.py` → HU-021)
 - **V4 Integraciones** — HU-009 dedup ✅ ya hecho; HU-011/012/013 pendientes
 - **V5 Calidad y robustez** 🆕 — HU-018→024 de la auditoría 2026-06-12 (HU-018/019 alta prioridad)
 - Bug parseo JSON resuelto: `.env` → `qwen2.5:7b` + `chat(..., think=False)`
@@ -524,7 +524,7 @@ el usuario no sabe si el sistema está colgado o procesando.
 
 Usar `rich.progress` (ya disponible via Typer) o `tqdm`.
 
-**Estado:** Pendiente — `setup.py` solo imprime `[OK] {archivo} - {chunks} chunks` por archivo. Falta: barra de progreso, `archivo X de Y`, mensaje final `Indexado completo — N archivos, X chunks`. (Nota: la progressbar de `cli/main.py` es para el *análisis*, no el indexado.)
+**Estado:** ✅ Completo (2026-06-19) en el flujo CLI — `cli/main.py::_ensure_indexed` muestra barra rich con `on_progress` callback: `archivo X de Y` (`MofNCompleteColumn` + descripción), tiempo transcurrido (`TimeElapsedColumn`), final `Indexado completo - N archivos, X chunks` (fuera del `with`, no corrompe el render), y sin barra si hay 1 solo archivo (`files_count > 1`). El script legacy `setup.py` sigue con `print [OK]` plano, pero duplica `find_files` + llama `indexar` en vez de `index_project` → su limpieza queda en HU-021 (dedup de infraestructura), no acá.
 
 ---
 
@@ -764,10 +764,10 @@ de parseo de fences (HU-018).
 
 ---
 
-### V3 — Experiencia de uso 🚧 EN CURSO (próximo)
+### V3 — Experiencia de uso ✅ COMPLETO
 
-- HU-016 Auto-indexado del proyecto — pendiente (próximo a trabajar)
-- HU-017 Progreso de indexado — pendiente
+- HU-016 Auto-indexado del proyecto ✅
+- HU-017 Progreso de indexado ✅ (flujo CLI; limpieza de `setup.py` → HU-021)
 
 **Objetivo:** El usuario no necesita saber que ChromaDB existe. El sistema se configura solo.
 

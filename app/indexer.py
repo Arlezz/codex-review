@@ -39,13 +39,14 @@ def indexar(path: str, project_name: str) -> int:
     chunk_size = 10
     overlap = 3
 
-    for i in range(len(chunks)):
+    for i, chunk in enumerate(chunks):
         linea_inicio = i * (chunk_size - overlap) + 1
+        num_lineas_chunk = len(chunk.splitlines())
         metadatas.append(
             {
                 "path": path,
                 "linea_inicio": linea_inicio,
-                "linea_fin": linea_inicio + chunk_size - 1,
+                "linea_fin": linea_inicio + num_lineas_chunk - 1,
             }
         )
 
