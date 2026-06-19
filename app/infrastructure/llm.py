@@ -2,19 +2,21 @@ import os
 
 from dotenv import load_dotenv
 from json_repair import repair_json
-from ollama import chat
+from ollama import Client
 from pydantic import TypeAdapter, ValidationError
 
 from app.domain.models import InputModel, Issue, IssuesResult
 
 load_dotenv()
 
-MODEL_NAME = os.getenv("MODEL_NAME", "qwen2.5:7b")
+MODEL_NAME = os.getenv("MODEL_NAME", "qwen3.5:9b-q8_0")
+OLLAMA_TIMEOUT = os.getenv("OLLAMA_TIMEOUT", 120)
 
 
 adapter = TypeAdapter(IssuesResult)
 schema = adapter.json_schema()
 
+client = Client(timeout=int(OLLAMA_TIMEOUT))
 
 TEMPLATE_PROMPT = """
 Analiza el siguiente código y retorna SOLO un objeto JSON con la clave "issues".
@@ -75,7 +77,7 @@ def code_analyzer(
 
     messages = [{"role": "user", "content": prompt}]
 
-    response = chat(
+    response = client.chat(
         model=MODEL_NAME,
         messages=messages,
         think=False,
@@ -99,7 +101,7 @@ def code_analyzer(
                 return code_analyzer(input_model, temperature=0.3, _attempt=_attempt + 1)
             else:
                 print(f"[PARSE FAILED] {e!r}\nContent: {content}")
-                return []
+                raise ValueError(f"No se pudo parsear la respuesta del modelo: {e}") from e
 
 
 def _format_rag(chunks: list[dict[str, str | int | float]]) -> str:
