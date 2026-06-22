@@ -7,7 +7,7 @@ from app.core.discovery import find_files
 from app.infrastructure.embeddings import _get_chroma, _get_chroma_metadata, _get_model
 
 
-def chunk_texto(texto: str, chunk_size: int = 10, overlap: int = 3) -> list[str]:
+def chunk_texto(texto: str, chunk_size: int = 10, overlap: int = 3) -> list[tuple[str, int]]:
     lineas = texto.splitlines()
     chunks = []
     i = 0
@@ -15,10 +15,8 @@ def chunk_texto(texto: str, chunk_size: int = 10, overlap: int = 3) -> list[str]
     while i < len(lineas):
         lineas_chunk = lineas[i : i + chunk_size]
         texto_chunk = "\n".join(lineas_chunk)
-        chunks.append(texto_chunk)
-
+        chunks.append((texto_chunk, i + 1))
         i += chunk_size - overlap
-
     return chunks
 
 
@@ -31,33 +29,32 @@ def indexar(path: str, project_name: str) -> int:
 
     chunks = chunk_texto(content_file)
 
-    chunks_embeddings = model.encode(chunks)
+    text_chunks = [c[0] for c in chunks]
+
+    text_chunks_embeddings = model.encode(text_chunks)
 
     coleccion = chroma.get_or_create_collection(project_name, metadata=_get_chroma_metadata())
 
     metadatas = []
-    chunk_size = 10
-    overlap = 3
 
-    for i, chunk in enumerate(chunks):
-        linea_inicio = i * (chunk_size - overlap) + 1
-        num_lineas_chunk = len(chunk.splitlines())
+    for chunk_text, init_line in chunks:
+        num_lineas_chunk = len(chunk_text.splitlines())
         metadatas.append(
             {
                 "path": path,
-                "linea_inicio": linea_inicio,
-                "linea_fin": linea_inicio + num_lineas_chunk - 1,
+                "linea_inicio": init_line,
+                "linea_fin": init_line + num_lineas_chunk - 1,
             }
         )
 
     coleccion.add(
         ids=[hashlib.md5(f"{path}:chunks_{i}".encode()).hexdigest() for i in range(len(chunks))],
-        documents=chunks,
-        embeddings=chunks_embeddings.tolist(),
+        documents=text_chunks,
+        embeddings=text_chunks_embeddings.tolist(),
         metadatas=metadatas,
     )
 
-    return len(chunks)
+    return len(text_chunks)
 
 
 def index_project(

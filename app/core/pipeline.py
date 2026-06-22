@@ -26,7 +26,7 @@ def pipeline(file: Path, collection: str, output_dir: str | None = None) -> Pipe
     file_metadata = extract_file_metadata(file, file_content.content)
     query = query_context(file_metadata)
 
-    context = search_context(query, collection) if query else []
+    context = search_context(query, collection, exclude_path=str(file)) if query else []
 
     payload = InputModel(
         file=str(file),
@@ -39,9 +39,6 @@ def pipeline(file: Path, collection: str, output_dir: str | None = None) -> Pipe
     )
 
     issues = code_analyzer(payload)
-
-    for i in issues:
-        print(f"RAW line={i.line} title={i.title}")
 
     issues_validated = issues_validator(issues, total_lines=len(file_content.content.splitlines()))
 

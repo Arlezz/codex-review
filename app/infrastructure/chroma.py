@@ -1,7 +1,18 @@
+import os
+
+from dotenv import load_dotenv
+
 from app.infrastructure.embeddings import _get_chroma, _get_chroma_metadata, _get_model
 
+load_dotenv()
 
-def search_context(query: str, collection: str, n_resultados: int = 5) -> list[dict]:
+RAG_MIN_RELEVANCE = float(os.getenv("RAG_MIN_RELEVANCE", 0.5))
+RAG_MAX_CHUNKS = int(os.getenv("RAG_MAX_CHUNKS", 3))
+
+
+def search_context(
+    query: str, collection: str, n_resultados: int = 5, exclude_path: str | None = None
+) -> list[dict]:
 
     model = _get_model()
     chroma = _get_chroma()
@@ -30,17 +41,26 @@ def search_context(query: str, collection: str, n_resultados: int = 5) -> list[d
     for i, doc in enumerate(documents[0]):
         meta = metadatas[0][i] if metadatas and metadatas[0] else {}
         distancia = distances[0][i] if distances and distances[0] else 0
+        relevancia = round(1 - distancia, 3)
+
+        if exclude_path and meta.get("path") == exclude_path:
+            continue
+
+        if relevancia < RAG_MIN_RELEVANCE:
+            continue
+
         chunks.append(
             {
                 "text": doc,
                 "path": meta.get("path"),
                 "linea_inicio": meta.get("linea_inicio"),
                 "linea_fin": meta.get("linea_fin"),
-                "relevancia": round(1 - distancia, 3),
+                "relevancia": relevancia,
             }
         )
 
-    return chunks
+    chunks.sort(key=lambda c: c["relevancia"], reverse=True)
+    return chunks[:RAG_MAX_CHUNKS]
 
 
 def get_documents_count(collection: str) -> int:

@@ -10,7 +10,7 @@ from app.domain.models import InputModel, Issue, IssuesResult
 load_dotenv()
 
 MODEL_NAME = os.getenv("MODEL_NAME", "qwen3.5:9b-q8_0")
-THINK_ENABLED = os.getenv("THINK_ENABLED", "true").lower() == "true"
+THINK_ENABLED = os.getenv("THINK_ENABLED", "false").lower() == "true"
 OLLAMA_TIMEOUT = int(os.getenv("OLLAMA_TIMEOUT", 120))
 CONTEXT_WINDOW = int(os.getenv("CONTEXT_WINDOW", 16384))
 OUTPUT_TOKENS = int(os.getenv("OUTPUT_TOKENS", 8192))
@@ -24,9 +24,43 @@ schema = adapter.json_schema()
 
 client = Client(timeout=OLLAMA_TIMEOUT)
 
+SYSTEM_PROMPT = """
+Eres un revisor de código senior. Analizas un bloque de código y reportas
+problemas reales y accionables. Tu salida es SIEMPRE un único objeto JSON
+válido con la clave "issues". No incluyas texto, explicaciones ni markdown
+antes o después del JSON.
+
+ENFOQUE (por orden de prioridad):
+1. Correctitud: bugs lógicos, casos límite, errores de tipo, valores None no
+   manejados, condiciones de carrera.
+2. Seguridad: inyección, secretos hardcodeados, validación de entrada ausente,
+   deserialización insegura.
+3. Manejo de errores y recursos: excepciones tragadas, archivos/conexiones sin
+   cerrar, fugas.
+4. Rendimiento con impacto real (no microoptimizaciones).
+5. Legibilidad y mantenibilidad.
+No reportes preferencias puramente estéticas salvo que afecten la claridad.
+
+SEVERIDAD (clasifica cada issue así):
+- critical: rompe la ejecución, vulnerabilidad de seguridad, o pérdida/corrupción
+  de datos.
+- warning: funciona pero es frágil (manejo de errores ausente, posibles None,
+  fugas de recursos, malas prácticas con impacto real).
+- suggestion: mejora de legibilidad, nombres, estilo o refactor menor sin impacto
+  funcional.
+
+REGLAS:
+- Antes de reportar un issue, verifica que el problema realmente esté presente.
+  No reportes algo que ya está implementado correctamente.
+- Si no encuentras ningún problema, retorna {"issues": []}.
+- Escribe title, description y solution SIEMPRE en español.
+- En code_example incluye únicamente el código corregido, sin envolverlo en
+  bloques markdown ni comillas triples. Si no aplica un ejemplo de código,
+  usa string vacío "".
+"""
+
 TEMPLATE_PROMPT = """
-Analiza el siguiente código y retorna SOLO un objeto JSON con la clave "issues".
-No incluyas texto antes ni después del JSON.
+Analiza el siguiente código.
 
 Archivo: {path}
 Lenguaje: {lenguaje}
@@ -34,28 +68,21 @@ Imports detectados: {imports}
 Funciones detectadas: {funciones}
 Clases detectadas: {clases}
 
-Contexto relacionado del proyecto (puede incluir fragmentos de OTRAS partes 
+Contexto relacionado del proyecto (puede incluir fragmentos de OTRAS partes
 del archivo o de OTROS archivos, recuperados por similitud semántica).
-Estos fragmentos son solo referencia de contexto general: pueden solaparse 
-entre sí y NO debes usar su numeración de líneas para nada relacionado 
+Estos fragmentos son solo referencia de contexto general: pueden solaparse
+entre sí y NO debes usar su numeración de líneas para nada relacionado
 al bloque "Código" de abajo.
 {rag}
 
 Código a analizar:
 El código viene con número de línea al inicio (N:).
-Usa ÚNICAMENTE esta numeración (la del bloque "Código a analizar") para 
-el campo line. Ignora cualquier número de línea mencionado en el contexto 
-del proyecto de arriba: pertenece a otros fragmentos y puede no coincidir 
+Usa ÚNICAMENTE esta numeración (la del bloque "Código a analizar") para
+el campo line. Ignora cualquier número de línea mencionado en el contexto
+del proyecto de arriba: pertenece a otros fragmentos y puede no coincidir
 con este bloque.
 El N: es referencia, no parte del código.
 {codigo}
-
-IMPORTANTE:
-- Antes de reportar un issue, verifica que el problema realmente esté presente en el código. 
-- No reportes como issue algo que ya está implementado correctamente.
-- Si no encuentras ningún problema, retorna {{"issues": []}}.
-- En code_example incluye únicamente el código, sin envolverlo en bloques markdown 
-ni usar comillas triples (```)
 
 Retorna SOLO esto:
 {{
@@ -70,7 +97,6 @@ Retorna SOLO esto:
         }}
     ]
 }}
-
 """
 
 
@@ -90,7 +116,10 @@ def code_analyzer(
         codigo=_format_code(input_model.code),
     )
 
-    messages = [{"role": "user", "content": prompt}]
+    messages = [
+        {"role": "system", "content": SYSTEM_PROMPT},
+        {"role": "user", "content": prompt},
+    ]
 
     response = client.chat(
         model=MODEL_NAME,
@@ -119,7 +148,7 @@ def code_analyzer(
             return result.issues
         except ValidationError as e:
             if _attempt < 1:
-                return code_analyzer(input_model, _attempt=_attempt + 1)
+                return code_analyzer(input_model, temperature=temperature, _attempt=_attempt + 1)
             else:
                 print(f"[PARSE FAILED] {e!r}\nContent: {content}")
                 raise ValueError(f"No se pudo parsear la respuesta del modelo: {e}") from e

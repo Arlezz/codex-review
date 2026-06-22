@@ -1,5 +1,4 @@
 import os
-import re
 
 from chromadb import PersistentClient
 from dotenv import load_dotenv
@@ -14,7 +13,7 @@ _chroma = None
 def _get_model():
     global _model
     if _model is None:
-        _model = SentenceTransformer(os.getenv("EMBEDDING_MODEL", "all-MiniLM-L6-v2"))
+        _model = SentenceTransformer(os.getenv("EMBEDDING_MODEL"))
     return _model
 
 
