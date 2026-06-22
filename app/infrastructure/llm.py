@@ -1,5 +1,6 @@
 import os
 
+from anthropic import Anthropic, transform_schema
 from dotenv import load_dotenv
 from json_repair import repair_json
 from ollama import Client
@@ -8,6 +9,9 @@ from pydantic import TypeAdapter, ValidationError
 from app.domain.models import InputModel, Issue, IssuesResult
 
 load_dotenv()
+
+LLM_PROVIDER = os.getenv("LLM_PROVIDER", "ollama")
+CLAUDE_MODEL = os.getenv("CLAUDE_MODEL", "claude-opus-4-8")
 
 MODEL_NAME = os.getenv("MODEL_NAME", "qwen3.5:9b-q8_0")
 THINK_ENABLED = os.getenv("THINK_ENABLED", "false").lower() == "true"
@@ -21,8 +25,10 @@ TOP_K = int(os.getenv("TOP_K", 20))
 
 adapter = TypeAdapter(IssuesResult)
 schema = adapter.json_schema()
+claude_schema = transform_schema(schema) if LLM_PROVIDER == "claude" else None
 
-client = Client(timeout=OLLAMA_TIMEOUT)
+ollama_client = Client(timeout=OLLAMA_TIMEOUT) if LLM_PROVIDER == "ollama" else None
+anthropic_client = Anthropic() if LLM_PROVIDER == "claude" else None
 
 SYSTEM_PROMPT = """
 Eres un revisor de código senior. Analizas un bloque de código y reportas
@@ -100,11 +106,31 @@ Retorna SOLO esto:
 """
 
 
-def code_analyzer(
-    input_model: InputModel, temperature: float = TEMPERATURE, _attempt: int = 0
-) -> list[Issue]:
+def _format_rag(chunks: list[dict[str, str | int | float]]) -> str:
 
-    prompt = TEMPLATE_PROMPT.format(
+    if not chunks:
+        return "Sin contexto disponible."
+
+    rag_formatted = ""
+
+    for chunk in chunks:
+        rag_formatted += (
+            f"--- Fragmento de contexto (no autoritativo para numeración) "
+            f"de {chunk['path']} "
+            f"[rango aproximado original: {chunk['linea_inicio']}-{chunk['linea_fin']}, "
+            f"relevancia {chunk['relevancia']}] ---\n"
+        )
+        rag_formatted += str(chunk["text"]) + "\n"
+
+    return rag_formatted
+
+
+def _format_code(code: str) -> str:
+    return "\n".join(f"{i}: {line}" for i, line in enumerate(code.splitlines(), 1))
+
+
+def _build_prompt(input_model: InputModel) -> str:
+    return TEMPLATE_PROMPT.format(
         path=input_model.file,
         lenguaje=input_model.language,
         imports=", ".join(input_model.imports),
@@ -116,12 +142,21 @@ def code_analyzer(
         codigo=_format_code(input_model.code),
     )
 
+
+def _analyze_ollama(
+    input_model: InputModel, temperature: float = TEMPERATURE, _attempt: int = 0
+) -> list[Issue]:
+
+    assert ollama_client is not None, "No se ha configurado el cliente de Ollama"
+
+    prompt = _build_prompt(input_model)
+
     messages = [
         {"role": "system", "content": SYSTEM_PROMPT},
         {"role": "user", "content": prompt},
     ]
 
-    response = client.chat(
+    response = ollama_client.chat(
         model=MODEL_NAME,
         messages=messages,
         think=THINK_ENABLED,
@@ -148,30 +183,49 @@ def code_analyzer(
             return result.issues
         except ValidationError as e:
             if _attempt < 1:
-                return code_analyzer(input_model, temperature=temperature, _attempt=_attempt + 1)
+                return _analyze_ollama(input_model, temperature=temperature, _attempt=_attempt + 1)
             else:
                 print(f"[PARSE FAILED] {e!r}\nContent: {content}")
                 raise ValueError(f"No se pudo parsear la respuesta del modelo: {e}") from e
 
 
-def _format_rag(chunks: list[dict[str, str | int | float]]) -> str:
+def _analyze_claude(input_model: InputModel) -> list[Issue]:
 
-    if not chunks:
-        return "Sin contexto disponible."
+    assert anthropic_client is not None, "No se ha configurado el cliente de Anthropic"
+    assert claude_schema is not None, "No se ha configurado el esquema de validación de Claude"
 
-    rag_formatted = ""
+    prompt = _build_prompt(input_model)
 
-    for chunk in chunks:
-        rag_formatted += (
-            f"--- Fragmento de contexto (no autoritativo para numeración) "
-            f"de {chunk['path']} "
-            f"[rango aproximado original: {chunk['linea_inicio']}-{chunk['linea_fin']}, "
-            f"relevancia {chunk['relevancia']}] ---\n"
-        )
-        rag_formatted += str(chunk["text"]) + "\n"
+    response = anthropic_client.messages.create(
+        model=CLAUDE_MODEL,
+        max_tokens=16000,
+        system=SYSTEM_PROMPT,
+        thinking={"type": "adaptive"},
+        messages=[
+            {"role": "user", "content": prompt},
+        ],
+        output_config={
+            "format": {
+                "type": "json_schema",
+                "schema": claude_schema,
+            }
+        },
+    )
 
-    return rag_formatted
+    if response.stop_reason == "refusal":
+        raise ValueError("Claude rechazó la request por seguridad.")
+    text = next((b.text for b in response.content if b.type == "text"), None)
+    if not text:
+        raise ValueError(f"Sin bloque de texto (stop_reason={response.stop_reason})")
+    return adapter.validate_json(text).issues
 
 
-def _format_code(code: str) -> str:
-    return "\n".join(f"{i}: {line}" for i, line in enumerate(code.splitlines(), 1))
+def code_analyzer(
+    input_model: InputModel, temperature: float = TEMPERATURE, _attempt: int = 0
+) -> list[Issue]:
+    if LLM_PROVIDER == "ollama":
+        return _analyze_ollama(input_model, temperature, _attempt)
+    elif LLM_PROVIDER == "claude":
+        return _analyze_claude(input_model)
+    else:
+        raise ValueError(f"LLM_PROVIDER no reconocido: {LLM_PROVIDER}")
