@@ -109,6 +109,7 @@ def emit(result: PipelineResult, stdout: bool, output_dir: str):
         color = severity_colors.get(issue.severity, "white")
         console.print(f"[{color}]{issue.severity}[/{color}] línea {issue.line}: {issue.title}")
         console.print(issue.description)
+        console.print("")
 
 
 @app.command()

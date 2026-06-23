@@ -15,6 +15,7 @@ chroma_db/
 
 # Reportes generados
 generated_reports/
+reports/
 
 # Variables de entorno
 .env
