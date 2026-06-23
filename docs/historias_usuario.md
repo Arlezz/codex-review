@@ -28,7 +28,7 @@ LLM probabilístico     → solo razona sobre el código, no controla nada
 - **V1 MVP** ✅ completo
 - **V2 Precisión** ✅ completo (+ multi-proyecto via `--project`)
 - **V3 Experiencia** ✅ completo — HU-016 auto-indexado, HU-017 progreso indexado (limpieza `setup.py` → HU-021)
-- **V4 Integraciones** — HU-009 dedup ✅ ya hecho; HU-011/012/013 pendientes
+- **V4 Integraciones** — HU-009 dedup ✅, HU-025 multi-provider LLM (Ollama default|Claude) ✅; HU-011/012/013 pendientes
 - **V5 Calidad y robustez** 🆕 — HU-018→024 de la auditoría 2026-06-12 (HU-018/019 alta prioridad)
 - Bug parseo JSON resuelto: `.env` → `qwen2.5:7b` + `chat(..., think=False)`
 
@@ -411,6 +411,50 @@ Como usuario, quiero combinar análisis estático con reasoning LLM.
 
 ---
 
+### HU-025 — Provider LLM configurable con default
+
+**Descripción**
+Como usuario, quiero elegir entre un LLM local (Ollama) y uno cloud (Claude)
+mediante configuración, con un default sensato que funcione sin claves externas.
+
+**Contexto técnico**
+El experimento de falsos positivos cerró a favor de Claude (mata FP de naming
+español que Qwen 7B inventa — ver investigación interna). Pero Ollama es local,
+gratis y sin dependencias de red. La solución no es elegir uno: es dejar ambos
+toggleables y que el sistema arranque sin config para el usuario casual.
+`llm.py` ya implementa el toggle `LLM_PROVIDER` (ollama|claude), con clientes
+construidos perezosamente (`else None`) según el provider activo, schema
+transformado para Anthropic, y dispatch en `code_analyzer`.
+
+**Alcance**
+
+- Variable `LLM_PROVIDER` (`ollama`|`claude`) leída de `.env`
+- **Default = `ollama`** cuando la variable no está seteada (cero config, cero costo)
+- `CLAUDE_MODEL` configurable (default `claude-opus-4-8`)
+- Solo se construye el cliente del provider activo (no exige la API key del otro)
+- Error claro si se elige `claude` sin `ANTHROPIC_API_KEY`
+- Error claro si `LLM_PROVIDER` tiene un valor no reconocido
+
+**Criterios de aceptación**
+
+- Sin `LLM_PROVIDER` en `.env`, el sistema usa Ollama y corre sin API key
+- `LLM_PROVIDER=claude` enruta el análisis a la API de Claude
+- Elegir `claude` sin `ANTHROPIC_API_KEY` produce error claro, no un stack trace críptico
+- Un `LLM_PROVIDER` inválido falla con mensaje explícito (`LLM_PROVIDER no reconocido: ...`)
+- La API key nunca se commitea (`.env` gitignored)
+
+**Estado:** ✅ Completo (2026-06-22) — toggle commiteado en `aaf7b40`.
+`llm.py`: `LLM_PROVIDER` default `ollama` (línea 13), `_analyze_ollama` /
+`_analyze_claude` separados, dispatch en `code_analyzer` con `raise` para
+provider no reconocido. Guard de `stop_reason=="refusal"` en la rama Claude.
+`.env` no trackeado → API key no filtrada (verificado). Guard fail-fast en el
+import: `LLM_PROVIDER=claude` sin `ANTHROPIC_API_KEY` lanza `ValueError`
+("LLM_PROVIDER=claude requiere ANTHROPIC_API_KEY para funcionar") antes de
+instanciar `Anthropic()`. Cliente y `claude_schema` solo se construyen con
+provider=claude activo.
+
+---
+
 ## MÓDULO 7 — CLI
 
 ### HU-014 — CLI de análisis
@@ -779,6 +823,7 @@ de parseo de fences (HU-018).
 - HU-011 Export JSON — pendiente
 - HU-012 Git Diff — pendiente
 - HU-013 Linters — pendiente
+- HU-025 Provider LLM configurable (Ollama default | Claude) — ✅ **completo**
 
 **Objetivo:** Integración con herramientas externas.
 

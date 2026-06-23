@@ -11,8 +11,8 @@ from app.domain.models import InputModel, Issue, IssuesResult
 load_dotenv()
 
 LLM_PROVIDER = os.getenv("LLM_PROVIDER", "ollama")
+ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
 CLAUDE_MODEL = os.getenv("CLAUDE_MODEL", "claude-opus-4-8")
-
 MODEL_NAME = os.getenv("MODEL_NAME", "qwen3.5:9b-q8_0")
 THINK_ENABLED = os.getenv("THINK_ENABLED", "false").lower() == "true"
 OLLAMA_TIMEOUT = int(os.getenv("OLLAMA_TIMEOUT", 120))
@@ -25,10 +25,20 @@ TOP_K = int(os.getenv("TOP_K", 20))
 
 adapter = TypeAdapter(IssuesResult)
 schema = adapter.json_schema()
-claude_schema = transform_schema(schema) if LLM_PROVIDER == "claude" else None
 
-ollama_client = Client(timeout=OLLAMA_TIMEOUT) if LLM_PROVIDER == "ollama" else None
-anthropic_client = Anthropic() if LLM_PROVIDER == "claude" else None
+if LLM_PROVIDER == "claude":
+    if not ANTHROPIC_API_KEY:
+        raise ValueError("LLM_PROVIDER=claude requiere ANTHROPIC_API_KEY para funcionar")
+    anthropic_client = Anthropic(api_key=ANTHROPIC_API_KEY)
+    claude_schema = transform_schema(schema)
+    ollama_client = None
+elif LLM_PROVIDER == "ollama":
+    ollama_client = Client(timeout=OLLAMA_TIMEOUT)
+    anthropic_client = None
+    claude_schema = None
+else:
+    raise ValueError(f"LLM_PROVIDER no reconocido: {LLM_PROVIDER}")
+
 
 SYSTEM_PROMPT = """
 Eres un revisor de código senior. Analizas un bloque de código y reportas
@@ -223,9 +233,7 @@ def _analyze_claude(input_model: InputModel) -> list[Issue]:
 def code_analyzer(
     input_model: InputModel, temperature: float = TEMPERATURE, _attempt: int = 0
 ) -> list[Issue]:
-    if LLM_PROVIDER == "ollama":
-        return _analyze_ollama(input_model, temperature, _attempt)
-    elif LLM_PROVIDER == "claude":
+    if LLM_PROVIDER == "claude":
         return _analyze_claude(input_model)
     else:
-        raise ValueError(f"LLM_PROVIDER no reconocido: {LLM_PROVIDER}")
+        return _analyze_ollama(input_model, temperature, _attempt)
