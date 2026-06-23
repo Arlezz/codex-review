@@ -2,8 +2,35 @@ from collections import Counter
 from datetime import datetime
 from pathlib import Path
 
-from app.domain.models import Issue
+from app.domain.models import Issue, PipelineResult
 from app.reports.naming import SEVERITY_LABELS, SEVERITY_ORDER
+
+
+def _render_issues(issues: list[Issue], fence_lang: str) -> list[str]:
+
+    issues_render: list[str] = []
+
+    for i, issue in enumerate(issues, 1):
+        issues_render.append(f"## {i}. {issue.title} (línea {issue.line})")
+        issues_render.append(
+            f"**Severidad:** {SEVERITY_LABELS.get(issue.severity, issue.severity)}"
+        )
+        issues_render.append("")
+        issues_render.append("**Descripción:**")
+        issues_render.append(issue.description)
+        issues_render.append("")
+        issues_render.append("**Solución:**")
+        issues_render.append(issue.solution)
+        if issue.code_example:
+            issues_render.append("")
+            issues_render.append("**Ejemplo:**")
+            issues_render.append(f"```{fence_lang}")
+            issues_render.append(issue.code_example)
+            issues_render.append("```")
+        issues_render.append("---")
+        issues_render.append("")
+
+    return issues_render
 
 
 def save_report(
@@ -35,23 +62,7 @@ def save_report(
         report_lines.append(f"| {label} | {conteos.get(severity, 0)} |")
     report_lines.append("")
 
-    for i, issue in enumerate(sorted_issues, 1):
-        report_lines.append(f"## {i}. {issue.title} (línea {issue.line})")
-        report_lines.append(f"**Severidad:** {SEVERITY_LABELS.get(issue.severity, issue.severity)}")
-        report_lines.append("")
-        report_lines.append("**Descripción:**")
-        report_lines.append(issue.description)
-        report_lines.append("")
-        report_lines.append("**Solución:**")
-        report_lines.append(issue.solution)
-        if issue.code_example:
-            report_lines.append("")
-            report_lines.append("**Ejemplo:**")
-            report_lines.append(f"```{fence_lang}")
-            report_lines.append(issue.code_example)
-            report_lines.append("```")
-        report_lines.append("---")
-        report_lines.append("")
+    report_lines += _render_issues(sorted_issues, fence_lang)
 
     texto_markdown = "\n".join(report_lines)
     reporte.write_text(texto_markdown, encoding="utf-8")
@@ -60,3 +71,7 @@ def save_report(
         "path": str(reporte),
         "total_issues": len(issues),
     }
+
+
+def save_consolidated_report(result: list[PipelineResult], output_dir=None) -> dict | None:
+    pass

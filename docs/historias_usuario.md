@@ -29,7 +29,7 @@ LLM probabilístico     → solo razona sobre el código, no controla nada
 - **V2 Precisión** ✅ completo (+ multi-proyecto via `--project`)
 - **V3 Experiencia** ✅ completo — HU-016 auto-indexado, HU-017 progreso indexado (limpieza `setup.py` → HU-021)
 - **V4 Integraciones** — HU-009 dedup ✅, HU-025 multi-provider LLM (Ollama default|Claude) ✅, HU-011 export JSON ✅; HU-012/013 pendientes
-- **V5 Calidad y robustez** 🆕 — HU-018→024 de la auditoría 2026-06-12 (HU-018/019 ✅; HU-020→024 pendientes)
+- **V5 Calidad y robustez** 🆕 — HU-018→024 de la auditoría 2026-06-12 (HU-018/019/020 ✅; HU-021→024 pendientes)
 - **Quick wins CLI/output** ✅ (2026-06-23) — HU-011 export JSON, HU-014 flags `--output`/`--stdout`, HU-015 resumen avanzado (top files + tiempo)
 - Bug parseo JSON resuelto: `.env` → `qwen2.5:7b` + `chat(..., think=False)`
 
@@ -84,7 +84,7 @@ Leyenda: ✅ completo · 🟡 parcial · ⬜ pendiente
 | ------ | --------------------------------- | ------ | ----------------------------- |
 | HU-018 | Parseo robusto de salida LLM      | ✅     | `format=schema` + cascada     |
 | HU-019 | Resiliencia del pipeline          | ✅     | commit `2e83bb4`              |
-| HU-020 | Soporte multilenguaje real (JS/TS)| ⬜     |                               |
+| HU-020 | Soporte multilenguaje real (JS/TS)| ✅     | + Go/Rust; extractores + RAG  |
 | HU-021 | Deduplicación de infraestructura  | ⬜     |                               |
 | HU-022 | Logging y configuración central   | ⬜     |                               |
 | HU-023 | Consistencia de modelos y naming  | ⬜     |                               |
@@ -745,7 +745,17 @@ JS/TS: sin RAG, sin imports/funciones/clases. Incumple el alcance de HU-004.
 - Para TS/JS se detectan import/function/class/interface
 - El contexto RAG funciona en proyectos JS/TS
 
-**Estado:** Pendiente
+**Estado:** ✅ Completo (2026-06-23). Indexado ya era multilenguaje (`index_project` →
+`find_files`). El gap real era extracción de metadata: `context_builder._EXTRACTORS`
+solo tenía Python. Ahora hay extractores `_py`/`_js_ts`/`_go`/`_rs` (los 5 lenguajes +
+Go/Rust extra). `_js_ts` detecta import/require/function/arrow/class/interface;
+`_go`/`_rs` import/func/struct. Helpers `_split_args` (respeta generics anidados) y
+`_collapse_parens` (args multilínea). `EXTENSIONS` alineado con `find_files`
+(`.jsx` in, `.mjs` out). `query_context` lee interfaces/structs → RAG multilenguaje.
+Guard `language == "unknown"` corregido (antes `if not language` era rama muerta).
+Nota: structs/interfaces alimentan la query RAG pero NO el prompt LLM (`InputModel`
+sigue con imports/functions/clases) — decisión: el código completo ya va al prompt,
+valor marginal. B (plumbing al prompt) queda como pulido opcional, no requisito del AC.
 
 ---
 
@@ -917,7 +927,7 @@ de parseo de fences (HU-018).
 
 - HU-018 Parseo robusto de salida LLM — ✅ **completo**
 - HU-019 Resiliencia del pipeline — ✅ **completo** (commit `2e83bb4`)
-- HU-020 Soporte multilenguaje real (JS/TS)
+- HU-020 Soporte multilenguaje real (JS/TS) — ✅ **completo** (+ Go/Rust)
 - HU-021 Deduplicación de infraestructura
 - HU-022 Logging y configuración central
 - HU-023 Consistencia de modelos y naming

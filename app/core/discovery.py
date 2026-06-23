@@ -21,14 +21,13 @@ def find_files(
         file_to_ignore = {"__init__.py", "setup.py"}
 
     if extensions is None:
-        extensions = {".py", ".js", ".ts", ".jsx", ".tsx"}
+        extensions = {".py", ".js", ".ts", ".jsx", ".tsx", ".go", ".rs"}
 
     try:
         ruta = Path(path)
         archivos_encontrados: list[Path] = []
 
         for archivo in ruta.rglob("*"):
-
             if not archivo.is_file():
                 continue
 
