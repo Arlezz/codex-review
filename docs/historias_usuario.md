@@ -28,11 +28,12 @@ LLM probabilístico     → solo razona sobre el código, no controla nada
 - **V1 MVP** ✅ completo
 - **V2 Precisión** ✅ completo (+ multi-proyecto via `--project`)
 - **V3 Experiencia** ✅ completo — HU-016 auto-indexado, HU-017 progreso indexado (limpieza `setup.py` → HU-021)
-- **V4 Integraciones** — HU-009 dedup ✅, HU-025 multi-provider LLM (Ollama default|Claude) ✅; HU-011/012/013 pendientes
+- **V4 Integraciones** — HU-009 dedup ✅, HU-025 multi-provider LLM (Ollama default|Claude) ✅, HU-011 export JSON ✅; HU-012/013 pendientes
 - **V5 Calidad y robustez** 🆕 — HU-018→024 de la auditoría 2026-06-12 (HU-018/019 ✅; HU-020→024 pendientes)
+- **Quick wins CLI/output** ✅ (2026-06-23) — HU-011 export JSON, HU-014 flags `--output`/`--stdout`, HU-015 resumen avanzado (top files + tiempo)
 - Bug parseo JSON resuelto: `.env` → `qwen2.5:7b` + `chat(..., think=False)`
 
-**Pendientes sueltos:** HU-002 `.codexignore`, reporte consolidado de directorio (HU-010), flags CLI `--output`/`--stdout` (HU-014), resumen avanzado HU-015.
+**Pendientes sueltos:** HU-002 `.codexignore`, reporte consolidado de directorio (HU-010).
 
 ---
 
@@ -48,7 +49,7 @@ Leyenda: ✅ completo · 🟡 parcial · ⬜ pendiente
 | HU-003 | Lectura segura de archivos| ✅     | `filesystem.py::read_file`        |
 | HU-005 | Generación de issues      | ✅     | pipeline determinístico           |
 | HU-010 | Reporte Markdown          | 🟡     | falta consolidado de directorio   |
-| HU-014 | CLI de análisis           | 🟡     | faltan flags `--output`/`--stdout`|
+| HU-014 | CLI de análisis           | ✅     | flags `--output`/`--stdout` ✅    |
 
 ### V2 — Precisión ✅
 
@@ -73,7 +74,7 @@ Leyenda: ✅ completo · 🟡 parcial · ⬜ pendiente
 | ------ | ------------------------------- | ------ | ----------------------------- |
 | HU-009 | Deduplicación de issues         | ✅     | `validators.py`               |
 | HU-025 | Provider LLM configurable       | ✅     | toggle Ollama default \| Claude|
-| HU-011 | Exportación JSON                | ⬜     |                               |
+| HU-011 | Exportación JSON                | ✅     | `reports/json_report.py`      |
 | HU-012 | Integración Git Diff            | ⬜     |                               |
 | HU-013 | Integración con linters         | ⬜     |                               |
 
@@ -94,7 +95,7 @@ Leyenda: ✅ completo · 🟡 parcial · ⬜ pendiente
 | HU     | Título                   | Estado | Nota                          |
 | ------ | ------------------------ | ------ | ----------------------------- |
 | HU-002 | Configuración exclusiones (`.codexignore`) | ⬜ |                  |
-| HU-015 | Visualización resumida   | 🟡     | falta archivos-top + tiempo total |
+| HU-015 | Visualización resumida   | ✅     | top files + tiempo total + resumen archivo único |
 
 ---
 
@@ -439,7 +440,12 @@ Como usuario, quiero exportar resultados en JSON para integrarlos con otras herr
 - Mismo schema que los issues internos
 - Se genera junto al Markdown automáticamente
 
-**Estado:** Pendiente
+**Estado:** ✅ Completo (2026-06-23) — `app/reports/json_report.py::save_json_report`.
+Espejo de `save_report`: mismo `output_dir`, naming apareado `reporte_<name>.json`
+(usa `.name`, no `.stem`, para evitar colisión `main.py`/`main.ts`). Cada issue vía
+`dataclasses.asdict` (6 campos, schema estable). Estructura `{file, summary, issues}`.
+El CLI lo emite junto al markdown (salvo `--stdout`). Constantes de severidad
+movidas a `app/reports/naming.py` (compartidas con `markdown.py`).
 
 ---
 
@@ -554,7 +560,12 @@ codex-review analyze ./app --stdout
 - Muestra resumen al finalizar
 - Exit code 0 si no hay críticos, 1 si hay críticos
 
-**Estado:** Implementado ✅ — `app/cli/main.py` soporta archivo y directorio, `typer.progressbar`, resumen por severidad, exit codes 0/1. Requiere `--project`. Pendiente: flags `--output` y `--stdout`
+**Estado:** ✅ Completo (2026-06-23) — `app/cli/main.py` soporta archivo y directorio,
+barra rich, resumen por severidad, exit codes 0/1. Requiere `--project`. Flags
+`--output` (dir de salida configurable) y `--stdout` (imprime issues con rich, no
+guarda) implementados. `--output` + `--stdout` juntos → `typer.Exit(1)` con mensaje
+(mutuamente excluyentes). El guardado salió del `pipeline()` al CLI vía helper
+`emit(result, stdout, output_dir)`.
 
 ---
 
@@ -570,7 +581,11 @@ Como usuario, quiero ver un resumen rápido al finalizar el análisis.
 - Archivos con más issues listados primero
 - Tiempo total de análisis
 
-**Estado:** Parcialmente implementado — `app/cli/main.py` muestra total de archivos + issues por severidad. Pendiente: archivos con más issues primero, tiempo total
+**Estado:** ✅ Completo (2026-06-23) — `app/cli/main.py`: conteo per-archivo
+(`dict[file, Counter]`), totales globales por severidad (`sum(counters)`), archivos
+ordenados por total de issues desc ("Archivos con más issues"), tiempo total vía
+`time.perf_counter()`. Resumen visible también en archivo único (antes solo en
+directorio). Exit code usa `totals["critical"]`.
 
 ---
 
@@ -889,7 +904,7 @@ de parseo de fences (HU-018).
 ### V4 — Integraciones
 
 - HU-009 Deduplicación ✅ (ya en validators.py)
-- HU-011 Export JSON — pendiente
+- HU-011 Export JSON — ✅ **completo** (`reports/json_report.py`)
 - HU-012 Git Diff — pendiente
 - HU-013 Linters — pendiente
 - HU-025 Provider LLM configurable (Ollama default | Claude) — ✅ **completo**

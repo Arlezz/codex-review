@@ -7,12 +7,9 @@ from app.domain.validators import issues_validator
 from app.infrastructure.chroma import search_context
 from app.infrastructure.filesystem import read_file
 from app.infrastructure.llm import code_analyzer
-from app.reports.markdown import save_report
 
 
-def pipeline(file: Path, collection: str, output_dir: str | None = None) -> PipelineResult | None:
-
-    print("Pipeline executed")
+def pipeline(file: Path, collection: str) -> PipelineResult | None:
 
     file_content = read_file(str(file))
 
@@ -42,11 +39,9 @@ def pipeline(file: Path, collection: str, output_dir: str | None = None) -> Pipe
 
     issues_validated = issues_validator(issues, total_lines=len(file_content.content.splitlines()))
 
-    save_report(str(file), issues_validated, output_dir=output_dir, language=payload.language)
-
     return PipelineResult(
         file=str(file),
         issues=issues_validated,
         timestamp=datetime.now(),
-        # meta={"issues": issues},
+        meta={"language": payload.language},
     )

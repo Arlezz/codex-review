@@ -1,8 +1,11 @@
 import sys
+import time
+from collections import Counter
 from datetime import datetime
 from pathlib import Path
 
 import typer
+from rich.console import Console
 from rich.progress import (
     BarColumn,
     MofNCompleteColumn,
@@ -14,9 +17,13 @@ from rich.progress import (
 
 from app.core.discovery import find_files
 from app.core.pipeline import pipeline
+from app.domain.models import PipelineResult
 from app.indexer import index_project
 from app.infrastructure.chroma import get_documents_count, reset_collection
+from app.reports.json_report import save_json_report
+from app.reports.markdown import save_report
 
+console = Console()
 app = typer.Typer()
 
 
@@ -79,6 +86,31 @@ def _ensure_indexed(project: str, root: Path, reindex: bool) -> None:
     return
 
 
+def emit(result: PipelineResult, stdout: bool, output_dir: str):
+
+    severity_colors = {
+        "critical": "red",
+        "warning": "yellow",
+        "suggestion": "cyan",
+    }
+
+    if not stdout:
+        language = result.meta["language"] if result.meta else "unknown"
+        save_report(result.file, result.issues, output_dir, language)
+        save_json_report(result.file, result.issues, output_dir)
+        return
+
+    console.print(f"\n[bold]{result.file}[/bold]")
+    if not result.issues:
+        console.print("[green]Sin issues detectados.[/green]")
+        return
+
+    for issue in result.issues:
+        color = severity_colors.get(issue.severity, "white")
+        console.print(f"[{color}]{issue.severity}[/{color}] línea {issue.line}: {issue.title}")
+        console.print(issue.description)
+
+
 @app.command()
 def analyze(
     path: str = typer.Argument(..., help="Ruta al proyecto o al archivo"),
@@ -86,7 +118,16 @@ def analyze(
     reindex: bool = typer.Option(
         False, "--reindex", help="Reindexar el proyecto antes de analizar"
     ),
+    output: str = typer.Option(None, "--output", help="Directorio de salida de reportes"),
+    stdout: bool = typer.Option(
+        False, "--stdout", help="Salida por consola, no guardar en archivos"
+    ),
 ):
+
+    if output and stdout:
+        typer.echo("La opción --output no puede ser usada con --stdout")
+        raise typer.Exit(code=1)
+
     file_path = Path(path)
 
     if not file_path.exists():
@@ -97,18 +138,25 @@ def analyze(
 
     project_root = file_path if file_path.is_dir() else file_path.parent
 
+    start = time.perf_counter()
+
     _ensure_indexed(project, project_root, reindex)
 
     failed: list[tuple[Path, str]] = []
-    issues_result = {}
+
+    output_dir = (
+        output
+        if output
+        else f"generated_reports/{file_path.name}_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}"
+    )
+
+    results: list[PipelineResult] = []
 
     if file_path.is_file():
         try:
             result = pipeline(file_path, project)
             if result:
-                for issue in result.issues:
-                    issues_result.setdefault(issue.severity, 0)
-                    issues_result[issue.severity] += 1
+                results.append(result)
             else:
                 failed.append((file_path, "Sin resultados, no se pudo analizar."))
         except Exception as e:
@@ -116,23 +164,15 @@ def analyze(
 
     elif file_path.is_dir():
         files = find_files(path)
-        timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        output_dir = f"generated_reports/{file_path.name}_{timestamp}"
         print(f"Archivos encontrados: {len(files)}")
         with make_progress_bar() as progress:
             task = progress.add_task("Analizando archivos", total=len(files))
             for file in files:
                 progress.console.print(f"Analizando: {file}")
                 try:
-                    result = pipeline(
-                        file,
-                        project,
-                        output_dir=output_dir,
-                    )
+                    result = pipeline(file, project)
                     if result:
-                        for issue in result.issues:
-                            issues_result.setdefault(issue.severity, 0)
-                            issues_result[issue.severity] += 1
+                        results.append(result)
                     else:
                         failed.append((file, "Sin resultados, no se pudo analizar."))
                 except Exception as e:
@@ -140,19 +180,34 @@ def analyze(
                 finally:
                     progress.update(task, advance=1)
 
+    for r in results:
+        emit(r, stdout, output_dir)
+
+    issues_result = {r.file: Counter(issue.severity for issue in r.issues) for r in results}
+
+    totals = sum(issues_result.values(), Counter())
+
     print("\nAnálisis completo.")
-    if file_path.is_dir():
-        print(f"Total de archivos analizados: {len(files) - len(failed)}")
-        print("\nResumen de problemas encontrados:")
-        for severity, count in issues_result.items():
-            print(f"  {severity.capitalize()}: {count}")
+    print(f"Total de archivos analizados: {len(results)}")
+    print("\nResumen de problemas encontrados:")
+    for severity, count in totals.items():
+        print(f"  {severity.capitalize()}: {count}")
+
+    top = sorted(issues_result.items(), key=lambda kv: sum(kv[1].values()), reverse=True)
+    print("\nArchivos con más issues:")
+    for file, counter in top:
+        if sum(counter.values()) == 0:
+            continue
+        print(f"  {file}: {sum(counter.values())}")
 
     if failed:
         print("\nErrores encontrados:")
         for file, error in failed:
             print(f"  {file}: {error}")
 
-    if issues_result.get("critical", 0) > 0 or failed:
+    print(f"\nTiempo total: {time.perf_counter() - start:.2f}s")
+
+    if totals.get("critical", 0) > 0 or failed:
         sys.exit(1)
 
     sys.exit(0)

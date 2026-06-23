@@ -3,13 +3,7 @@ from datetime import datetime
 from pathlib import Path
 
 from app.domain.models import Issue
-
-SEVERITY_LABELS = {
-    "critical": "Crítico",
-    "warning": "Advertencia",
-    "suggestion": "Sugerencia",
-}
-SEVERITY_ORDER = {sev: i for i, sev in enumerate(SEVERITY_LABELS)}
+from app.reports.naming import SEVERITY_LABELS, SEVERITY_ORDER
 
 
 def save_report(
