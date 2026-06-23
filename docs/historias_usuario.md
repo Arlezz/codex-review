@@ -29,10 +29,72 @@ LLM probabilístico     → solo razona sobre el código, no controla nada
 - **V2 Precisión** ✅ completo (+ multi-proyecto via `--project`)
 - **V3 Experiencia** ✅ completo — HU-016 auto-indexado, HU-017 progreso indexado (limpieza `setup.py` → HU-021)
 - **V4 Integraciones** — HU-009 dedup ✅, HU-025 multi-provider LLM (Ollama default|Claude) ✅; HU-011/012/013 pendientes
-- **V5 Calidad y robustez** 🆕 — HU-018→024 de la auditoría 2026-06-12 (HU-018/019 alta prioridad)
+- **V5 Calidad y robustez** 🆕 — HU-018→024 de la auditoría 2026-06-12 (HU-018/019 ✅; HU-020→024 pendientes)
 - Bug parseo JSON resuelto: `.env` → `qwen2.5:7b` + `chat(..., think=False)`
 
 **Pendientes sueltos:** HU-002 `.codexignore`, reporte consolidado de directorio (HU-010), flags CLI `--output`/`--stdout` (HU-014), resumen avanzado HU-015.
+
+---
+
+## Resumen de Historias de Usuario por versión
+
+Leyenda: ✅ completo · 🟡 parcial · ⬜ pendiente
+
+### V1 — MVP funcional ✅
+
+| HU     | Título                    | Estado | Nota                              |
+| ------ | ------------------------- | ------ | --------------------------------- |
+| HU-001 | Escaneo de directorios    | ✅     | `discovery.py::find_files`        |
+| HU-003 | Lectura segura de archivos| ✅     | `filesystem.py::read_file`        |
+| HU-005 | Generación de issues      | ✅     | pipeline determinístico           |
+| HU-010 | Reporte Markdown          | 🟡     | falta consolidado de directorio   |
+| HU-014 | CLI de análisis           | 🟡     | faltan flags `--output`/`--stdout`|
+
+### V2 — Precisión ✅
+
+| HU     | Título                          | Estado | Nota                          |
+| ------ | ------------------------------- | ------ | ----------------------------- |
+| HU-004 | Context Builder                 | ✅     |                               |
+| HU-006 | Clasificación de severidad      | ✅     |                               |
+| HU-007 | Prevención de falsos positivos  | ✅     |                               |
+| HU-008 | Validación estructural          | ✅     |                               |
+| —      | Multi-proyecto (`--project`)    | ✅     | extra fuera de HU             |
+
+### V3 — Experiencia de uso ✅
+
+| HU     | Título                  | Estado | Nota                                    |
+| ------ | ----------------------- | ------ | --------------------------------------- |
+| HU-016 | Auto-indexado           | ✅     | `cli/main.py::_ensure_indexed`          |
+| HU-017 | Progreso de indexado    | ✅     | barra rich; limpieza `setup.py` → HU-021|
+
+### V4 — Integraciones
+
+| HU     | Título                          | Estado | Nota                          |
+| ------ | ------------------------------- | ------ | ----------------------------- |
+| HU-009 | Deduplicación de issues         | ✅     | `validators.py`               |
+| HU-025 | Provider LLM configurable       | ✅     | toggle Ollama default \| Claude|
+| HU-011 | Exportación JSON                | ⬜     |                               |
+| HU-012 | Integración Git Diff            | ⬜     |                               |
+| HU-013 | Integración con linters         | ⬜     |                               |
+
+### V5 — Calidad y robustez
+
+| HU     | Título                            | Estado | Nota                          |
+| ------ | --------------------------------- | ------ | ----------------------------- |
+| HU-018 | Parseo robusto de salida LLM      | ✅     | `format=schema` + cascada     |
+| HU-019 | Resiliencia del pipeline          | ✅     | commit `2e83bb4`              |
+| HU-020 | Soporte multilenguaje real (JS/TS)| ⬜     |                               |
+| HU-021 | Deduplicación de infraestructura  | ⬜     |                               |
+| HU-022 | Logging y configuración central   | ⬜     |                               |
+| HU-023 | Consistencia de modelos y naming  | ⬜     |                               |
+| HU-024 | Suite de tests del camino crítico | ⬜     |                               |
+
+### Sin versión asignada
+
+| HU     | Título                   | Estado | Nota                          |
+| ------ | ------------------------ | ------ | ----------------------------- |
+| HU-002 | Configuración exclusiones (`.codexignore`) | ⬜ |                  |
+| HU-015 | Visualización resumida   | 🟡     | falta archivos-top + tiempo total |
 
 ---
 
@@ -634,7 +696,14 @@ La llamada a Ollama no tiene timeout ni reintento.
 - Caída de Ollama se reporta como error, no como crash
 - El resumen indica cuántos archivos fallaron
 
-**Estado:** Pendiente — prioridad alta
+**Estado:** ✅ Completo (commit `2e83bb4`). try/except por archivo en el loop del
+CLI (`cli/main.py:106-141`, archivo único y directorio) → acumula en `failed` y
+continúa (`finally` avanza la barra). Path inexistente → `typer.Exit(code=1)`
+con mensaje claro (`main.py:92-94`). Timeout Ollama vía `OLLAMA_TIMEOUT`
+(`llm.py:18,36`). Resumen final lista archivos fallados y descuenta del total
+(`main.py:145,150-153`); exit 1 si hay críticos o fallos. Nota: el try/except
+vive en el orquestador CLI, no dentro de `pipeline()` — las excepciones de
+`pipeline` propagan y se capturan por archivo, cumpliendo el AC igual.
 
 ---
 
@@ -832,7 +901,7 @@ de parseo de fences (HU-018).
 ### V5 — Calidad y robustez
 
 - HU-018 Parseo robusto de salida LLM — ✅ **completo**
-- HU-019 Resiliencia del pipeline — **alta prioridad**
+- HU-019 Resiliencia del pipeline — ✅ **completo** (commit `2e83bb4`)
 - HU-020 Soporte multilenguaje real (JS/TS)
 - HU-021 Deduplicación de infraestructura
 - HU-022 Logging y configuración central
